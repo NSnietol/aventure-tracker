@@ -1,0 +1,412 @@
+"""Page Object Model components for Google Flights scraper."""
+
+import logging
+import re
+from datetime import date, datetime, timedelta
+
+from playwright.async_api import Page
+
+from aventure_tracker.scrapers.google_flights.locators import (
+    ConsentLocators,
+    FiltersLocators,
+    ResultsLocators,
+    SearchFormLocators,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ConsentHandler:
+    """Handles cookie consent dialogs."""
+
+    def __init__(self, page: Page) -> None:
+        self._page = page
+
+    async def dismiss_consent_if_present(self) -> bool:
+        """Dismiss consent dialog if present.
+
+        Returns:
+            True if consent was dismissed, False otherwise.
+        """
+        try:
+            accept_btn = await self._page.query_selector(
+                ConsentLocators.ACCEPT_ALL_BUTTON
+            )
+            if accept_btn:
+                await accept_btn.click()
+                logger.debug("Consent dialog dismissed")
+                return True
+        except Exception as e:
+            logger.debug(f"No consent dialog or error: {e}")
+        return False
+
+
+class SearchForm:
+    """Page object for the flight search form."""
+
+    def __init__(self, page: Page) -> None:
+        self._page = page
+
+    async def set_origin(self, airport_code: str) -> None:
+        """Set the origin airport.
+
+        Args:
+            airport_code: IATA airport code (e.g., "BAQ").
+        """
+        try:
+            # Click on origin input area
+            origin_input = await self._page.wait_for_selector(
+                SearchFormLocators.ORIGIN_INPUT,
+                timeout=5000,
+            )
+            if origin_input:
+                await origin_input.click()
+                await origin_input.fill("")
+                await self._page.keyboard.type(airport_code, delay=100)
+                # Wait for autocomplete and select first option
+                await self._page.wait_for_timeout(500)
+                await self._page.keyboard.press("ArrowDown")
+                await self._page.keyboard.press("Enter")
+                logger.debug(f"Set origin: {airport_code}")
+        except Exception as e:
+            logger.warning(f"Failed to set origin {airport_code}: {e}")
+            raise
+
+    async def set_destination(self, airport_code: str) -> None:
+        """Set the destination airport.
+
+        Args:
+            airport_code: IATA airport code (e.g., "MDE").
+        """
+        try:
+            dest_input = await self._page.wait_for_selector(
+                SearchFormLocators.DESTINATION_INPUT,
+                timeout=5000,
+            )
+            if dest_input:
+                await dest_input.click()
+                await dest_input.fill("")
+                await self._page.keyboard.type(airport_code, delay=100)
+                await self._page.wait_for_timeout(500)
+                await self._page.keyboard.press("ArrowDown")
+                await self._page.keyboard.press("Enter")
+                logger.debug(f"Set destination: {airport_code}")
+        except Exception as e:
+            logger.warning(f"Failed to set destination {airport_code}: {e}")
+            raise
+
+    async def set_departure_date(self, travel_date: date) -> None:
+        """Set the departure date.
+
+        Args:
+            travel_date: The travel date.
+        """
+        try:
+            date_input = await self._page.wait_for_selector(
+                SearchFormLocators.DEPARTURE_DATE_INPUT,
+                timeout=5000,
+            )
+            if date_input:
+                await date_input.click()
+                # Select date from calendar
+                date_selector = f"[data-iso='{travel_date.isoformat()}']"
+                await self._page.wait_for_selector(date_selector, timeout=5000)
+                await self._page.click(date_selector)
+
+                # Click done button if present
+                try:
+                    done_btn = await self._page.query_selector(
+                        SearchFormLocators.CALENDAR_DONE_BUTTON
+                    )
+                    if done_btn:
+                        await done_btn.click()
+                except Exception:
+                    pass
+
+                logger.debug(f"Set departure date: {travel_date}")
+        except Exception as e:
+            logger.warning(f"Failed to set date {travel_date}: {e}")
+            raise
+
+    async def select_one_way(self) -> None:
+        """Select one-way trip type."""
+        try:
+            dropdown = await self._page.query_selector(
+                SearchFormLocators.TRIP_TYPE_DROPDOWN
+            )
+            if dropdown:
+                await dropdown.click()
+                await self._page.wait_for_timeout(300)
+                await self._page.click(SearchFormLocators.ONE_WAY_OPTION)
+                logger.debug("Selected one-way trip")
+        except Exception as e:
+            logger.debug(f"Could not select one-way: {e}")
+
+    async def submit_search(self) -> None:
+        """Click the search button."""
+        try:
+            search_btn = await self._page.wait_for_selector(
+                SearchFormLocators.SEARCH_BUTTON,
+                timeout=5000,
+            )
+            if search_btn:
+                await search_btn.click()
+                logger.debug("Search submitted")
+        except Exception as e:
+            logger.warning(f"Failed to submit search: {e}")
+            raise
+
+
+class ResultsPage:
+    """Page object for flight search results."""
+
+    def __init__(self, page: Page) -> None:
+        self._page = page
+
+    async def wait_for_results(self, timeout_ms: int = 30000) -> bool:
+        """Wait for results to load.
+
+        Args:
+            timeout_ms: Maximum time to wait.
+
+        Returns:
+            True if results loaded, False if no results found.
+        """
+        try:
+            # Wait for loading to finish
+            await self._page.wait_for_selector(
+                ResultsLocators.LOADING_INDICATOR,
+                state="hidden",
+                timeout=timeout_ms,
+            )
+        except Exception:
+            pass  # Loading indicator may not always appear
+
+        # Check for results
+        try:
+            await self._page.wait_for_selector(
+                f"{ResultsLocators.PRICE_ELEMENT}, {ResultsLocators.NO_RESULTS}",
+                timeout=timeout_ms,
+            )
+            logger.debug("Results page loaded")
+            return True
+        except Exception as e:
+            logger.warning(f"Results not loaded: {e}")
+            return False
+
+    async def get_cheapest_price(self) -> int | None:
+        """Extract the cheapest flight price from results.
+
+        Returns:
+            Price in COP as integer, or None if not found.
+        """
+        try:
+            # Try multiple price selectors
+            price_selectors = [
+                ResultsLocators.CHEAPEST_PRICE,
+                ResultsLocators.PRICE_ELEMENT,
+                ".YMlIz .FpEdX",
+                "[data-gs]",
+            ]
+
+            for selector in price_selectors:
+                elements = await self._page.query_selector_all(selector)
+                for element in elements:
+                    text = await element.text_content()
+                    if text:
+                        price = self._parse_price(text)
+                        if price:
+                            logger.debug(f"Found price: {price} COP")
+                            return price
+
+            logger.warning("No price found in results")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error extracting price: {e}")
+            return None
+
+    async def get_all_prices(self) -> list[int]:
+        """Get all prices from the results page.
+
+        Returns:
+            List of prices in COP.
+        """
+        prices: list[int] = []
+
+        try:
+            elements = await self._page.query_selector_all(
+                ResultsLocators.PRICE_ELEMENT
+            )
+
+            for element in elements:
+                text = await element.text_content()
+                if text:
+                    price = self._parse_price(text)
+                    if price and price not in prices:
+                        prices.append(price)
+
+            logger.debug(f"Found {len(prices)} unique prices")
+
+        except Exception as e:
+            logger.error(f"Error getting prices: {e}")
+
+        return sorted(prices)
+
+    async def get_flight_details(self) -> list[dict]:
+        """Extract detailed flight information.
+
+        Returns:
+            List of flight detail dictionaries.
+        """
+        flights: list[dict] = []
+
+        try:
+            cards = await self._page.query_selector_all(
+                ResultsLocators.FLIGHT_LIST_ITEM
+            )
+
+            for card in cards[:10]:  # Limit to first 10 results
+                try:
+                    flight = await self._extract_flight_from_card(card)
+                    if flight:
+                        flights.append(flight)
+                except Exception as e:
+                    logger.debug(f"Could not extract flight: {e}")
+                    continue
+
+            logger.debug(f"Extracted {len(flights)} flight details")
+
+        except Exception as e:
+            logger.error(f"Error extracting flight details: {e}")
+
+        return flights
+
+    async def _extract_flight_from_card(self, card) -> dict | None:
+        """Extract flight info from a result card.
+
+        Args:
+            card: The card element.
+
+        Returns:
+            Flight info dictionary or None.
+        """
+        try:
+            # Extract price
+            price_elem = await card.query_selector(ResultsLocators.PRICE_ELEMENT)
+            price_text = await price_elem.text_content() if price_elem else None
+            price = self._parse_price(price_text) if price_text else None
+
+            if not price:
+                return None
+
+            # Extract airline
+            airline_elem = await card.query_selector(ResultsLocators.AIRLINE_NAME)
+            airline = await airline_elem.text_content() if airline_elem else "Unknown"
+
+            # Extract duration
+            duration_elem = await card.query_selector(ResultsLocators.DURATION)
+            duration = await duration_elem.text_content() if duration_elem else "N/A"
+
+            # Extract stops
+            stops_elem = await card.query_selector(ResultsLocators.STOPS_INFO)
+            stops_text = await stops_elem.text_content() if stops_elem else "Direct"
+            stops = self._parse_stops(stops_text)
+
+            return {
+                "price": price,
+                "airline": airline.strip() if airline else "Unknown",
+                "duration": duration.strip() if duration else "N/A",
+                "stops": stops,
+            }
+
+        except Exception as e:
+            logger.debug(f"Card extraction failed: {e}")
+            return None
+
+    def _parse_price(self, text: str | None) -> int | None:
+        """Parse price from text.
+
+        Args:
+            text: Price text like "COP 125.000" or "$125,000".
+
+        Returns:
+            Price as integer or None.
+        """
+        if not text:
+            return None
+
+        # Remove currency symbols and whitespace
+        cleaned = text.replace("COP", "").replace("$", "").strip()
+
+        # Handle different thousand separators
+        # Colombian format: 125.000 or 125,000
+        cleaned = cleaned.replace(".", "").replace(",", "")
+
+        # Extract digits
+        digits = re.sub(r"[^\d]", "", cleaned)
+
+        if digits:
+            try:
+                return int(digits)
+            except ValueError:
+                pass
+
+        return None
+
+    def _parse_stops(self, text: str | None) -> int:
+        """Parse number of stops from text.
+
+        Args:
+            text: Stops text like "Sin escalas", "1 escala", "2 escalas".
+
+        Returns:
+            Number of stops as integer.
+        """
+        if not text:
+            return 0
+
+        text_lower = text.lower()
+
+        if "sin" in text_lower or "directo" in text_lower or "nonstop" in text_lower:
+            return 0
+
+        # Find number in text
+        match = re.search(r"(\d+)", text)
+        if match:
+            return int(match.group(1))
+
+        return 0
+
+
+class FiltersPanel:
+    """Page object for flight filters."""
+
+    def __init__(self, page: Page) -> None:
+        self._page = page
+
+    async def filter_nonstop_only(self) -> None:
+        """Apply filter to show only nonstop flights."""
+        try:
+            dropdown = await self._page.query_selector(
+                FiltersLocators.STOPS_DROPDOWN
+            )
+            if dropdown:
+                await dropdown.click()
+                await self._page.wait_for_timeout(300)
+                await self._page.click(FiltersLocators.NONSTOP_OPTION)
+                await self._page.wait_for_timeout(500)
+                logger.debug("Applied nonstop filter")
+        except Exception as e:
+            logger.debug(f"Could not apply nonstop filter: {e}")
+
+    async def apply_filters(self) -> None:
+        """Click apply filters button if present."""
+        try:
+            apply_btn = await self._page.query_selector(
+                FiltersLocators.APPLY_FILTERS
+            )
+            if apply_btn:
+                await apply_btn.click()
+        except Exception:
+            pass
