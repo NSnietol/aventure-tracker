@@ -1,1 +1,1 @@
-"""Unit tests for Aventure Tracker."""
+"""Unit tests for Adventure Tracker."""

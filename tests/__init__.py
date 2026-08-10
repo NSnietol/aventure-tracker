@@ -1,1 +1,1 @@
-"""Test suite for Aventure Tracker."""
+"""Adventure Tracker test suite."""

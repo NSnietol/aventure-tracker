@@ -1,0 +1,11 @@
+# =============================================================================
+# Done - Completed Activities
+# =============================================================================
+# Add activities you've already done to exclude them from notifications.
+# Format: "Destination - Date" or just "Destination"
+
+activities:
+  # Example entries (uncomment and modify):
+  # - "Guatapé - Agosto 2024"
+  # - "Bungee Medellín"
+  # - "Jardín - Marzo 2024"

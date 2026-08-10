@@ -1,0 +1,146 @@
+# =============================================================================
+# Colombian Holidays / Festivos Colombianos
+# =============================================================================
+# Holidays that affect weekend trip planning (puentes).
+# Type:
+#   - fixed: Always on this date
+#   - moved_monday: Moves to next Monday (Ley 51 de 1983)
+
+holidays:
+  2025:
+    - date: "2025-01-01"
+      name: "Año Nuevo"
+      type: fixed
+
+    - date: "2025-01-06"
+      name: "Reyes Magos"
+      type: moved_monday
+
+    - date: "2025-03-24"
+      name: "San José"
+      type: moved_monday
+
+    - date: "2025-04-17"
+      name: "Jueves Santo"
+      type: fixed
+
+    - date: "2025-04-18"
+      name: "Viernes Santo"
+      type: fixed
+
+    - date: "2025-05-01"
+      name: "Día del Trabajo"
+      type: fixed
+
+    - date: "2025-06-02"
+      name: "Ascensión del Señor"
+      type: moved_monday
+
+    - date: "2025-06-23"
+      name: "Corpus Christi"
+      type: moved_monday
+
+    - date: "2025-06-30"
+      name: "Sagrado Corazón"
+      type: moved_monday
+
+    - date: "2025-07-20"
+      name: "Independencia"
+      type: fixed
+
+    - date: "2025-08-07"
+      name: "Batalla de Boyacá"
+      type: fixed
+
+    - date: "2025-08-18"
+      name: "Asunción de la Virgen"
+      type: moved_monday
+
+    - date: "2025-10-13"
+      name: "Día de la Raza"
+      type: moved_monday
+
+    - date: "2025-11-03"
+      name: "Todos los Santos"
+      type: moved_monday
+
+    - date: "2025-11-17"
+      name: "Independencia de Cartagena"
+      type: moved_monday
+
+    - date: "2025-12-08"
+      name: "Inmaculada Concepción"
+      type: fixed
+
+    - date: "2025-12-25"
+      name: "Navidad"
+      type: fixed
+
+  2026:
+    - date: "2026-01-01"
+      name: "Año Nuevo"
+      type: fixed
+
+    - date: "2026-01-12"
+      name: "Reyes Magos"
+      type: moved_monday
+
+    - date: "2026-03-23"
+      name: "San José"
+      type: moved_monday
+
+    - date: "2026-04-02"
+      name: "Jueves Santo"
+      type: fixed
+
+    - date: "2026-04-03"
+      name: "Viernes Santo"
+      type: fixed
+
+    - date: "2026-05-01"
+      name: "Día del Trabajo"
+      type: fixed
+
+    - date: "2026-05-18"
+      name: "Ascensión del Señor"
+      type: moved_monday
+
+    - date: "2026-06-08"
+      name: "Corpus Christi"
+      type: moved_monday
+
+    - date: "2026-06-15"
+      name: "Sagrado Corazón"
+      type: moved_monday
+
+    - date: "2026-07-20"
+      name: "Independencia"
+      type: fixed
+
+    - date: "2026-08-07"
+      name: "Batalla de Boyacá"
+      type: fixed
+
+    - date: "2026-08-17"
+      name: "Asunción de la Virgen"
+      type: moved_monday
+
+    - date: "2026-10-12"
+      name: "Día de la Raza"
+      type: moved_monday
+
+    - date: "2026-11-02"
+      name: "Todos los Santos"
+      type: moved_monday
+
+    - date: "2026-11-16"
+      name: "Independencia de Cartagena"
+      type: moved_monday
+
+    - date: "2026-12-08"
+      name: "Inmaculada Concepción"
+      type: fixed
+
+    - date: "2026-12-25"
+      name: "Navidad"
+      type: fixed

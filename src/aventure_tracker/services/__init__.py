@@ -1,1 +1,1 @@
-"""Business logic services for Aventure Tracker."""
+"""Business logic services for Adventure Tracker."""

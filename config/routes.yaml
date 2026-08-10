@@ -1,0 +1,27 @@
+# =============================================================================
+# Flight Routes Configuration
+# =============================================================================
+# Define the flight routes to monitor for price alerts.
+#
+# Fields:
+#   - origin: Airport IATA code (e.g., BAQ for Barranquilla)
+#   - destination: Airport IATA code (e.g., MDE for Medellín)
+#   - price_threshold: Maximum price in COP to trigger notification
+#   - drop_percentage: Minimum price drop % to trigger notification
+
+routes:
+  - origin: BAQ
+    destination: MDE
+    price_threshold: 150000
+    drop_percentage: 15
+
+  - origin: CTG
+    destination: MDE
+    price_threshold: 150000
+    drop_percentage: 15
+
+  # Uncomment to add return routes
+  # - origin: MDE
+  #   destination: BAQ
+  #   price_threshold: 150000
+  #   drop_percentage: 15

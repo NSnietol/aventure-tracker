@@ -1,0 +1,13 @@
+# =============================================================================
+# Instagram Accounts Configuration
+# =============================================================================
+# Define the Instagram accounts to monitor for new adventure activities.
+
+accounts:
+  - username: brutaltravel.co
+    name: Brutal Travel
+    enabled: true
+
+  - username: medellinbungee
+    name: Medellín Bungee
+    enabled: true

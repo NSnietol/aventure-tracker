@@ -1,1 +1,1 @@
-"""Integration tests for Aventure Tracker."""
+"""Integration tests for Adventure Tracker."""
