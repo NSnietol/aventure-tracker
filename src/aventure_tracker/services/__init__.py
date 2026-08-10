@@ -1,6 +1,11 @@
 """Business logic services for Adventure Tracker."""
 
 from aventure_tracker.services.flight_dates import FlightDateCalculator
+from aventure_tracker.services.flight_tracker import (
+    FlightTrackerResult,
+    FlightTrackerService,
+    PriceAlert,
+)
 from aventure_tracker.services.holidays import HolidayService, HolidayServiceError
 from aventure_tracker.services.inventory import InventoryManager, MatchResult
 from aventure_tracker.services.ocr import ExtractedActivity, OCRError, OCRProcessor
@@ -8,10 +13,13 @@ from aventure_tracker.services.ocr import ExtractedActivity, OCRError, OCRProces
 __all__ = [
     "ExtractedActivity",
     "FlightDateCalculator",
+    "FlightTrackerResult",
+    "FlightTrackerService",
     "HolidayService",
     "HolidayServiceError",
     "InventoryManager",
     "MatchResult",
     "OCRError",
     "OCRProcessor",
+    "PriceAlert",
 ]
