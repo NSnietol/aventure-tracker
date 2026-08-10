@@ -9,6 +9,13 @@ from aventure_tracker.services.activity_tracker import (
     ActivityTrackerResult,
     ActivityTrackerService,
 )
+from aventure_tracker.services.event_extractor import (
+    EventInfo,
+    extract_date_from_text,
+    extract_event_info,
+    extract_event_name,
+    slugify,
+)
 from aventure_tracker.services.flight_dates import FlightDateCalculator
 from aventure_tracker.services.flight_tracker import (
     FlightTrackerResult,
@@ -25,6 +32,7 @@ __all__ = [
     "ActivityRecord",
     "ActivityTrackerResult",
     "ActivityTrackerService",
+    "EventInfo",
     "ExtractedActivity",
     "FlightDateCalculator",
     "FlightTrackerResult",
@@ -36,4 +44,8 @@ __all__ = [
     "OCRError",
     "OCRProcessor",
     "PriceAlert",
+    "extract_date_from_text",
+    "extract_event_info",
+    "extract_event_name",
+    "slugify",
 ]
