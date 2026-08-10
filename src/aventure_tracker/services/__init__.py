@@ -1,5 +1,9 @@
 """Business logic services for Adventure Tracker."""
 
+from aventure_tracker.services.activity_history import (
+    ActivityHistoryManager,
+    ActivityRecord,
+)
 from aventure_tracker.services.activity_tracker import (
     ActivityAlert,
     ActivityTrackerResult,
@@ -17,6 +21,8 @@ from aventure_tracker.services.ocr import ExtractedActivity, OCRError, OCRProces
 
 __all__ = [
     "ActivityAlert",
+    "ActivityHistoryManager",
+    "ActivityRecord",
     "ActivityTrackerResult",
     "ActivityTrackerService",
     "ExtractedActivity",
