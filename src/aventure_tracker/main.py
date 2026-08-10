@@ -15,10 +15,18 @@ from aventure_tracker.services.activity_tracker import (
     ActivityTrackerResult,
     ActivityTrackerService,
 )
+from aventure_tracker.services.flight_calendar import (
+    FlightCalendarDisplay,
+)
 from aventure_tracker.services.flight_tracker import (
     FlightTrackerResult,
     FlightTrackerService,
 )
+from aventure_tracker.services.holidays import HolidayService
+from aventure_tracker.services.flight_dates import FlightDateCalculator
+
+# Default weeks ahead for flight calendar (user requested 2.5 months planning horizon)
+DEFAULT_WEEKS_AHEAD = 10
 
 
 class RunMode(Enum):
@@ -27,6 +35,7 @@ class RunMode(Enum):
     ALL = "all"
     FLIGHTS = "flights"
     ACTIVITIES = "activities"
+    CALENDAR = "calendar"  # Show flight calendar only
 
 
 @dataclass
@@ -65,33 +74,37 @@ class AdventureOrchestrator:
 
     Attributes:
         settings: Application settings.
-        mode: Execution mode (all, flights, activities).
+        mode: Execution mode (all, flights, activities, calendar).
     """
 
     def __init__(
         self,
         settings: Settings | None = None,
         mode: RunMode = RunMode.ALL,
-        weeks_ahead: int = 8,
+        weeks_ahead: int = DEFAULT_WEEKS_AHEAD,
         max_posts_per_account: int = 10,
+        show_calendar: bool = False,
     ) -> None:
         """Initialize the orchestrator.
 
         Args:
             settings: Application settings (uses global if not provided).
             mode: Execution mode.
-            weeks_ahead: Weeks ahead to check for flights.
+            weeks_ahead: Weeks ahead to check for flights (default: 10).
             max_posts_per_account: Max Instagram posts per account.
+            show_calendar: Whether to display the flight calendar.
         """
         self._settings = settings or Settings()
         self._mode = mode
         self._weeks_ahead = weeks_ahead
         self._max_posts = max_posts_per_account
+        self._show_calendar = show_calendar
 
         self._state_manager: StateManager | None = None
         self._notifier: TelegramNotifier | None = None
         self._flight_tracker: FlightTrackerService | None = None
         self._activity_tracker: ActivityTrackerService | None = None
+        self._calendar_display: FlightCalendarDisplay | None = None
 
         self._logger = logging.getLogger(__name__)
 
@@ -126,7 +139,7 @@ class AdventureOrchestrator:
 
     def _init_trackers(self) -> None:
         """Initialize tracker services."""
-        if self._mode in (RunMode.ALL, RunMode.FLIGHTS):
+        if self._mode in (RunMode.ALL, RunMode.FLIGHTS, RunMode.CALENDAR):
             self._flight_tracker = FlightTrackerService(
                 routes_config_path=self._settings.get_routes_path(),
                 holidays_config_path=self._settings.get_holidays_path(),
@@ -135,6 +148,18 @@ class AdventureOrchestrator:
                 weeks_ahead=self._weeks_ahead,
             )
             self._logger.info("Flight tracker initialized")
+
+            # Initialize calendar display for flights/calendar mode
+            if self._mode in (RunMode.FLIGHTS, RunMode.CALENDAR) or self._show_calendar:
+                holiday_service = HolidayService(
+                    config_path=self._settings.get_holidays_path()
+                )
+                date_calculator = FlightDateCalculator(holiday_service=holiday_service)
+                self._calendar_display = FlightCalendarDisplay(
+                    date_calculator=date_calculator,
+                    weeks_ahead=self._weeks_ahead,
+                )
+                self._logger.info("Flight calendar display initialized")
 
         if self._mode in (RunMode.ALL, RunMode.ACTIVITIES):
             self._activity_tracker = ActivityTrackerService(
@@ -165,14 +190,28 @@ class AdventureOrchestrator:
         errors: list[str] = []
         flights_result: FlightTrackerResult | None = None
         activities_result: ActivityTrackerResult | None = None
+        calendar_prices: dict = {}
 
         try:
             # Initialize infrastructure
             await self._init_infrastructure()
             self._init_trackers()
 
+            # Calendar-only mode: just show the calendar template
+            if self._mode == RunMode.CALENDAR:
+                self._show_flight_calendar(calendar_prices)
+                return OrchestratorResult(
+                    mode=self._mode,
+                    flights_result=None,
+                    activities_result=None,
+                    total_alerts=0,
+                    total_notifications=0,
+                    errors=[],
+                    duration_seconds=(datetime.now() - start_time).total_seconds(),
+                )
+
             # Run flight tracker
-            if self._flight_tracker:
+            if self._flight_tracker and self._mode != RunMode.CALENDAR:
                 try:
                     self._logger.info("Running flight tracker...")
                     flights_result = await self._flight_tracker.track_flights()
@@ -184,6 +223,10 @@ class AdventureOrchestrator:
                     error = f"Flight tracker failed: {e}"
                     self._logger.error(error)
                     errors.append(error)
+
+            # Show calendar after flight tracking if requested
+            if self._show_calendar and self._calendar_display:
+                self._show_flight_calendar(calendar_prices)
 
             # Run activity tracker
             if self._activity_tracker:
@@ -252,6 +295,47 @@ class AdventureOrchestrator:
 
         return result
 
+    def _show_flight_calendar(
+        self,
+        prices: dict[tuple, int] | None = None,
+        previous_prices: dict[tuple, int] | None = None,
+    ) -> None:
+        """Display the flight calendar in the console.
+
+        Args:
+            prices: Dict of (date, route_str) -> price.
+            previous_prices: Optional dict of previous prices for comparison.
+        """
+        if not self._calendar_display:
+            self._logger.warning("Calendar display not initialized")
+            return
+
+        if not self._flight_tracker:
+            self._logger.warning("Flight tracker not initialized")
+            return
+
+        try:
+            # Get routes from config
+            routes = self._flight_tracker._load_routes()
+
+            # Build calendar data
+            data = self._calendar_display.build_calendar_data(
+                routes=routes.routes,
+                prices=prices or {},
+                previous_prices=previous_prices,
+            )
+
+            # Display calendar
+            print("\n")
+            self._calendar_display.display(data)
+
+            # Show summary
+            print(self._calendar_display.render_summary(data))
+            print()
+
+        except Exception as e:
+            self._logger.error(f"Failed to display calendar: {e}")
+
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser.
@@ -268,7 +352,9 @@ Examples:
   aventure-tracker                  # Run all trackers
   aventure-tracker --mode flights   # Only track flights
   aventure-tracker --mode activities # Only track activities
-  aventure-tracker --weeks 4        # Check 4 weeks ahead for flights
+  aventure-tracker --mode calendar  # Show flight calendar only
+  aventure-tracker --calendar       # Show calendar after tracking
+  aventure-tracker --weeks 12       # Check 12 weeks ahead for flights
   aventure-tracker --verbose        # Enable debug logging
         """,
     )
@@ -277,7 +363,7 @@ Examples:
         "--mode",
         "-m",
         type=str,
-        choices=["all", "flights", "activities"],
+        choices=["all", "flights", "activities", "calendar"],
         default="all",
         help="Execution mode (default: all)",
     )
@@ -286,8 +372,14 @@ Examples:
         "--weeks",
         "-w",
         type=int,
-        default=8,
-        help="Weeks ahead to check for flights (default: 8)",
+        default=DEFAULT_WEEKS_AHEAD,
+        help=f"Weeks ahead to check for flights (default: {DEFAULT_WEEKS_AHEAD})",
+    )
+
+    parser.add_argument(
+        "--calendar",
+        action="store_true",
+        help="Show flight calendar after tracking",
     )
 
     parser.add_argument(
@@ -362,6 +454,7 @@ async def async_main(args: argparse.Namespace) -> int:
         mode=mode,
         weeks_ahead=args.weeks,
         max_posts_per_account=args.max_posts,
+        show_calendar=args.calendar,
     )
 
     result = await orchestrator.run()

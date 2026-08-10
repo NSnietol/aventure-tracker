@@ -85,11 +85,16 @@ class TestRunMode:
         """Test ACTIVITIES mode value."""
         assert RunMode.ACTIVITIES.value == "activities"
 
+    def test_calendar_mode(self) -> None:
+        """Test CALENDAR mode value."""
+        assert RunMode.CALENDAR.value == "calendar"
+
     def test_parse_from_string(self) -> None:
         """Test parsing mode from string."""
         assert RunMode("all") == RunMode.ALL
         assert RunMode("flights") == RunMode.FLIGHTS
         assert RunMode("activities") == RunMode.ACTIVITIES
+        assert RunMode("calendar") == RunMode.CALENDAR
 
 
 class TestOrchestratorResult:
@@ -152,8 +157,9 @@ class TestAdventureOrchestratorInit:
         orchestrator = AdventureOrchestrator()
 
         assert orchestrator._mode == RunMode.ALL
-        assert orchestrator._weeks_ahead == 8
+        assert orchestrator._weeks_ahead == 10  # Changed from 8 to 10
         assert orchestrator._max_posts == 10
+        assert orchestrator._show_calendar is False
 
     def test_init_with_custom_values(self, mock_settings: Settings) -> None:
         """Test initialization with custom values."""
@@ -162,11 +168,13 @@ class TestAdventureOrchestratorInit:
             mode=RunMode.FLIGHTS,
             weeks_ahead=4,
             max_posts_per_account=5,
+            show_calendar=True,
         )
 
         assert orchestrator._mode == RunMode.FLIGHTS
         assert orchestrator._weeks_ahead == 4
         assert orchestrator._max_posts == 5
+        assert orchestrator._show_calendar is True
 
 
 class TestOrchestratorRun:
@@ -350,11 +358,12 @@ class TestCLIParser:
         args = parser.parse_args([])
 
         assert args.mode == "all"
-        assert args.weeks == 8
+        assert args.weeks == 10  # Changed from 8 to 10
         assert args.max_posts == 10
         assert args.config_dir == "config"
         assert args.verbose is False
         assert args.dry_run is False
+        assert args.calendar is False
 
     def test_mode_argument(self) -> None:
         """Test mode argument parsing."""
@@ -365,6 +374,16 @@ class TestCLIParser:
 
         args = parser.parse_args(["-m", "activities"])
         assert args.mode == "activities"
+
+        args = parser.parse_args(["-m", "calendar"])
+        assert args.mode == "calendar"
+
+    def test_calendar_argument(self) -> None:
+        """Test calendar flag argument."""
+        parser = create_parser()
+
+        args = parser.parse_args(["--calendar"])
+        assert args.calendar is True
 
     def test_weeks_argument(self) -> None:
         """Test weeks argument parsing."""
@@ -457,6 +476,7 @@ class TestAsyncMain:
             config_dir=str(tmp_path),
             verbose=False,
             dry_run=True,  # Don't send notifications
+            calendar=False,
         )
 
         with patch(
@@ -489,6 +509,7 @@ class TestAsyncMain:
             max_posts=5,
             config_dir=str(tmp_path),
             verbose=False,
+            calendar=False,
             dry_run=True,
         )
 
