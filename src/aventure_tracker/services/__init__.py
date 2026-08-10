@@ -2,6 +2,7 @@
 
 from aventure_tracker.services.flight_dates import FlightDateCalculator
 from aventure_tracker.services.holidays import HolidayService, HolidayServiceError
+from aventure_tracker.services.inventory import InventoryManager, MatchResult
 from aventure_tracker.services.ocr import ExtractedActivity, OCRError, OCRProcessor
 
 __all__ = [
@@ -9,6 +10,8 @@ __all__ = [
     "FlightDateCalculator",
     "HolidayService",
     "HolidayServiceError",
+    "InventoryManager",
+    "MatchResult",
     "OCRError",
     "OCRProcessor",
 ]
