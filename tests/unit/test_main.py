@@ -63,6 +63,7 @@ def mock_activity_result() -> ActivityTrackerResult:
         accounts_checked=5,
         posts_found=50,
         posts_processed=45,
+        posts_skipped=0,
         alerts_generated=2,
         notifications_sent=2,
         errors=[],

@@ -13,6 +13,8 @@ from aventure_tracker.models.activity import (
     InstagramPost,
 )
 from aventure_tracker.scrapers.instagram import InstagramScraper
+from aventure_tracker.services.activity_history import ActivityHistoryManager
+from aventure_tracker.services.event_extractor import extract_event_info
 from aventure_tracker.services.inventory import InventoryManager, MatchResult
 from aventure_tracker.services.ocr import ExtractedActivity, OCRProcessor
 
@@ -28,12 +30,18 @@ class ActivityAlert:
         account: Account that posted.
         extracted: OCR extracted information (if available).
         match: Inventory match result.
+        event_id: Unique event identifier (date + name slug).
+        event_name: Human-readable event name.
+        event_date: Event date (ISO format) or None.
     """
 
     post: InstagramPost
     account: InstagramAccountConfig
     extracted: ExtractedActivity | None
     match: MatchResult
+    event_id: str = ""
+    event_name: str = ""
+    event_date: str | None = None
 
     @property
     def destination(self) -> str | None:
@@ -59,6 +67,7 @@ class ActivityTrackerResult:
         accounts_checked: Number of accounts checked.
         posts_found: Total posts found across all accounts.
         posts_processed: Posts processed with OCR.
+        posts_skipped: Posts skipped due to history limit (max 3 checks).
         alerts_generated: Number of alerts for wishlist matches.
         notifications_sent: Number of notifications sent.
         errors: List of error messages.
@@ -67,6 +76,7 @@ class ActivityTrackerResult:
     accounts_checked: int
     posts_found: int
     posts_processed: int
+    posts_skipped: int
     alerts_generated: int
     notifications_sent: int
     errors: list[str]
@@ -77,6 +87,8 @@ class ActivityTrackerService:
 
     Orchestrates Instagram scraping, OCR processing, inventory matching,
     and notification sending for adventure activities.
+
+    Tracks post history to avoid checking the same post more than 3 times.
 
     Attributes:
         accounts_config_path: Path to accounts.yaml configuration.
@@ -94,6 +106,7 @@ class ActivityTrackerService:
         notifier: TelegramNotifier | None = None,
         scraper: InstagramScraper | None = None,
         ocr_processor: OCRProcessor | None = None,
+        history_manager: ActivityHistoryManager | None = None,
         use_ocr: bool = True,
         max_posts_per_account: int = 10,
     ) -> None:
@@ -107,6 +120,7 @@ class ActivityTrackerService:
             notifier: TelegramNotifier for alerts (optional).
             scraper: InstagramScraper instance (optional).
             ocr_processor: OCRProcessor instance (optional).
+            history_manager: ActivityHistoryManager for post history (optional).
             use_ocr: Whether to use OCR processing.
             max_posts_per_account: Maximum posts to fetch per account.
         """
@@ -115,6 +129,7 @@ class ActivityTrackerService:
         self._notifier = notifier
         self._scraper = scraper
         self._ocr_processor = ocr_processor
+        self._history_manager = history_manager
         self._use_ocr = use_ocr
         self._max_posts = max_posts_per_account
 
@@ -155,6 +170,13 @@ class ActivityTrackerService:
 
         return self._ocr_processor
 
+    def _get_history_manager(self) -> ActivityHistoryManager | None:
+        """Get or create the history manager."""
+        if self._history_manager is None:
+            self._history_manager = ActivityHistoryManager()
+            self._history_manager.load()
+        return self._history_manager
+
     async def track_activities(
         self,
         since: datetime | None = None,
@@ -163,6 +185,8 @@ class ActivityTrackerService:
 
         Scrapes Instagram accounts, processes images with OCR, matches
         against wishlist, and sends notifications for new activities.
+
+        Posts are limited to 3 checks before being skipped permanently.
 
         Args:
             since: Only process posts newer than this datetime.
@@ -173,6 +197,7 @@ class ActivityTrackerService:
         accounts = self._load_accounts()
         scraper = self._get_scraper()
         ocr = self._get_ocr_processor()
+        history = self._get_history_manager()
 
         self._inventory.load()
 
@@ -180,6 +205,7 @@ class ActivityTrackerService:
             accounts_checked=0,
             posts_found=0,
             posts_processed=0,
+            posts_skipped=0,
             alerts_generated=0,
             notifications_sent=0,
             errors=[],
@@ -194,7 +220,15 @@ class ActivityTrackerService:
                 result.posts_found += len(posts)
 
                 for post in posts:
-                    # Skip if we've seen this post before
+                    # Check history limit (max 3 checks per post)
+                    if history and not history.should_check(account.username, post.id):
+                        logger.debug(
+                            f"Skipping post {post.id} - already checked 3 times"
+                        )
+                        result.posts_skipped += 1
+                        continue
+
+                    # Skip if we've seen this post before (legacy state manager check)
                     if self._is_post_seen(post.id):
                         continue
 
@@ -203,8 +237,24 @@ class ActivityTrackerService:
                     # Process with OCR if available and post has images
                     extracted = await self._process_post_ocr(post, ocr)
 
+                    # Extract event info for history tracking
+                    ocr_text = extracted.raw_text if extracted else None
+                    event_info = extract_event_info(post.caption or "", ocr_text)
+
                     # Match against inventory
                     match = self._inventory.match_post(post, extracted)
+
+                    # Record the check in history
+                    if history:
+                        history.record_check(
+                            account=account.username,
+                            post_id=post.id,
+                            event_id=event_info.event_id,
+                            event_name=event_info.event_name,
+                            event_date=event_info.event_date,
+                            matched_wishlist=match.is_wishlist_match,
+                            destination=match.matched_destination,
+                        )
 
                     # Generate alert if it's a new wishlist match
                     if match.is_wishlist_match and not match.is_already_done:
@@ -213,6 +263,9 @@ class ActivityTrackerService:
                             account=account,
                             extracted=extracted,
                             match=match,
+                            event_id=event_info.event_id,
+                            event_name=event_info.event_name,
+                            event_date=event_info.event_date,
                         )
                         result.alerts_generated += 1
 
@@ -229,9 +282,14 @@ class ActivityTrackerService:
                 logger.error(error_msg)
                 result.errors.append(error_msg)
 
+        # Save history after processing
+        if history:
+            history.save()
+
         logger.info(
             f"Activity tracking complete: {result.accounts_checked} accounts, "
-            f"{result.posts_found} posts, {result.alerts_generated} alerts"
+            f"{result.posts_found} posts, {result.posts_skipped} skipped, "
+            f"{result.alerts_generated} alerts"
         )
 
         return result
@@ -252,6 +310,7 @@ class ActivityTrackerService:
         """
         scraper = self._get_scraper()
         ocr = self._get_ocr_processor()
+        history = self._get_history_manager()
         self._inventory.load()
 
         alerts: list[ActivityAlert] = []
@@ -260,11 +319,29 @@ class ActivityTrackerService:
             posts = await scraper.scrape(account, since)
 
             for post in posts:
+                # Check history limit
+                if history and not history.should_check(account.username, post.id):
+                    continue
+
                 if self._is_post_seen(post.id):
                     continue
 
                 extracted = await self._process_post_ocr(post, ocr)
+                ocr_text = extracted.raw_text if extracted else None
+                event_info = extract_event_info(post.caption or "", ocr_text)
                 match = self._inventory.match_post(post, extracted)
+
+                # Record the check
+                if history:
+                    history.record_check(
+                        account=account.username,
+                        post_id=post.id,
+                        event_id=event_info.event_id,
+                        event_name=event_info.event_name,
+                        event_date=event_info.event_date,
+                        matched_wishlist=match.is_wishlist_match,
+                        destination=match.matched_destination,
+                    )
 
                 if match.is_wishlist_match and not match.is_already_done:
                     alert = ActivityAlert(
@@ -272,10 +349,17 @@ class ActivityTrackerService:
                         account=account,
                         extracted=extracted,
                         match=match,
+                        event_id=event_info.event_id,
+                        event_name=event_info.event_name,
+                        event_date=event_info.event_date,
                     )
                     alerts.append(alert)
 
                 self._mark_post_seen(post.id)
+
+            # Save history after checking
+            if history:
+                history.save()
 
         except Exception as e:
             logger.error(f"Error checking @{account.username}: {e}")
@@ -380,6 +464,28 @@ class ActivityTrackerService:
         self._inventory.load()
         return self._inventory.wishlist.destinations
 
+    def get_account_history_stats(self, account: str) -> dict[str, int]:
+        """Get history statistics for an account.
+
+        Args:
+            account: Instagram username.
+
+        Returns:
+            Dict with 'total', 'skipped', 'active' counts.
+        """
+        history = self._get_history_manager()
+        if history is None:
+            return {"total": 0, "skipped": 0, "active": 0}
+
+        records = history.get_account_history(account)
+        skipped = history.get_skipped_count(account)
+
+        return {
+            "total": len(records),
+            "skipped": skipped,
+            "active": len(records) - skipped,
+        }
+
     async def save_state(self) -> None:
         """Save state to persistence."""
         if self._state_manager:
@@ -387,3 +493,7 @@ class ActivityTrackerService:
 
         # Also save inventory if modified
         self._inventory.save()
+
+        # Save history
+        if self._history_manager:
+            self._history_manager.save()

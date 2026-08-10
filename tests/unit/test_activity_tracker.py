@@ -152,6 +152,19 @@ def mock_ocr(extracted_activity: ExtractedActivity) -> MagicMock:
 
 
 @pytest.fixture
+def mock_history_manager_base() -> MagicMock:
+    """Create a base mock history manager for main service fixture."""
+    manager = MagicMock()
+    manager.should_check.return_value = True
+    manager.record_check = MagicMock()
+    manager.save = MagicMock()
+    manager.load = MagicMock()
+    manager.get_account_history.return_value = []
+    manager.get_skipped_count.return_value = 0
+    return manager
+
+
+@pytest.fixture
 def service(
     accounts_config: Path,
     wishlist_config: Path,
@@ -160,6 +173,7 @@ def service(
     mock_notifier: AsyncMock,
     mock_scraper: AsyncMock,
     mock_ocr: MagicMock,
+    mock_history_manager_base: MagicMock,
 ) -> ActivityTrackerService:
     """Create an activity tracker service with mocked dependencies."""
     return ActivityTrackerService(
@@ -170,6 +184,7 @@ def service(
         notifier=mock_notifier,
         scraper=mock_scraper,
         ocr_processor=mock_ocr,
+        history_manager=mock_history_manager_base,
         use_ocr=True,
         max_posts_per_account=10,
     )
@@ -653,6 +668,7 @@ class TestActivityTrackerResultDataclass:
             accounts_checked=5,
             posts_found=50,
             posts_processed=45,
+            posts_skipped=5,
             alerts_generated=3,
             notifications_sent=3,
             errors=[],
@@ -660,5 +676,306 @@ class TestActivityTrackerResultDataclass:
 
         assert result.accounts_checked == 5
         assert result.posts_found == 50
+        assert result.posts_skipped == 5
         assert result.alerts_generated == 3
         assert result.errors == []
+
+
+
+class TestActivityAlertWithEventInfo:
+    """Tests for ActivityAlert with event information."""
+
+    def test_alert_with_event_info(
+        self,
+        post: InstagramPost,
+        account: InstagramAccountConfig,
+        match_result: MatchResult,
+    ) -> None:
+        """Test activity alert with event_id and event_name."""
+        alert = ActivityAlert(
+            post=post,
+            account=account,
+            extracted=None,
+            match=match_result,
+            event_id="2026-08-15-cocuy-trek",
+            event_name="Cocuy Trek",
+            event_date="2026-08-15",
+        )
+
+        assert alert.event_id == "2026-08-15-cocuy-trek"
+        assert alert.event_name == "Cocuy Trek"
+        assert alert.event_date == "2026-08-15"
+
+    def test_alert_default_event_info(
+        self,
+        post: InstagramPost,
+        account: InstagramAccountConfig,
+        match_result: MatchResult,
+    ) -> None:
+        """Test activity alert with default event info values."""
+        alert = ActivityAlert(
+            post=post,
+            account=account,
+            extracted=None,
+            match=match_result,
+        )
+
+        assert alert.event_id == ""
+        assert alert.event_name == ""
+        assert alert.event_date is None
+
+
+class TestHistoryIntegration:
+    """Tests for ActivityHistoryManager integration."""
+
+    @pytest.fixture
+    def mock_history_manager(self) -> MagicMock:
+        """Create a mock history manager."""
+        manager = MagicMock()
+        manager.should_check.return_value = True
+        manager.record_check = MagicMock()
+        manager.save = MagicMock()
+        manager.get_account_history.return_value = []
+        manager.get_skipped_count.return_value = 0
+        return manager
+
+    @pytest.fixture
+    def service_with_history(
+        self,
+        accounts_config: Path,
+        wishlist_config: Path,
+        done_config: Path,
+        mock_state_manager: MagicMock,
+        mock_notifier: AsyncMock,
+        mock_scraper: AsyncMock,
+        mock_ocr: MagicMock,
+        mock_history_manager: MagicMock,
+    ) -> ActivityTrackerService:
+        """Create an activity tracker service with history manager."""
+        return ActivityTrackerService(
+            accounts_config_path=accounts_config,
+            wishlist_config_path=wishlist_config,
+            done_config_path=done_config,
+            state_manager=mock_state_manager,
+            notifier=mock_notifier,
+            scraper=mock_scraper,
+            ocr_processor=mock_ocr,
+            history_manager=mock_history_manager,
+            use_ocr=True,
+        )
+
+    @pytest.mark.asyncio
+    async def test_track_skips_posts_at_history_limit(
+        self,
+        service_with_history: ActivityTrackerService,
+        mock_history_manager: MagicMock,
+    ) -> None:
+        """Test posts at history limit are skipped."""
+        # First post should be checked, second should be skipped
+        mock_history_manager.should_check.side_effect = [False, False]
+
+        with patch.object(
+            service_with_history._inventory,
+            "match_post",
+            return_value=MatchResult(
+                is_wishlist_match=False,
+                matched_destination=None,
+                is_already_done=False,
+                match_score=0.0,
+            ),
+        ):
+            result = await service_with_history.track_activities()
+
+        # Both posts should be skipped (1 per enabled account = 2)
+        assert result.posts_skipped == 2
+        assert result.posts_processed == 0
+
+    @pytest.mark.asyncio
+    async def test_track_records_check_in_history(
+        self,
+        service_with_history: ActivityTrackerService,
+        mock_history_manager: MagicMock,
+    ) -> None:
+        """Test track_activities records checks in history."""
+        with patch.object(
+            service_with_history._inventory,
+            "match_post",
+            return_value=MatchResult(
+                is_wishlist_match=True,
+                matched_destination="Guatapé",
+                is_already_done=False,
+                match_score=0.9,
+            ),
+        ):
+            await service_with_history.track_activities()
+
+        # Should record check for each post
+        mock_history_manager.record_check.assert_called()
+        assert mock_history_manager.record_check.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_track_saves_history(
+        self,
+        service_with_history: ActivityTrackerService,
+        mock_history_manager: MagicMock,
+    ) -> None:
+        """Test track_activities saves history after processing."""
+        with patch.object(
+            service_with_history._inventory,
+            "match_post",
+            return_value=MatchResult(
+                is_wishlist_match=False,
+                matched_destination=None,
+                is_already_done=False,
+                match_score=0.0,
+            ),
+        ):
+            await service_with_history.track_activities()
+
+        mock_history_manager.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_check_account_skips_history_limit(
+        self,
+        service_with_history: ActivityTrackerService,
+        account: InstagramAccountConfig,
+        mock_history_manager: MagicMock,
+    ) -> None:
+        """Test check_account respects history limit."""
+        mock_history_manager.should_check.return_value = False
+
+        alerts = await service_with_history.check_account(account)
+
+        assert len(alerts) == 0
+        mock_history_manager.record_check.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_check_account_records_and_saves_history(
+        self,
+        service_with_history: ActivityTrackerService,
+        account: InstagramAccountConfig,
+        mock_history_manager: MagicMock,
+    ) -> None:
+        """Test check_account records check and saves history."""
+        with patch.object(
+            service_with_history._inventory,
+            "match_post",
+            return_value=MatchResult(
+                is_wishlist_match=False,
+                matched_destination=None,
+                is_already_done=False,
+                match_score=0.0,
+            ),
+        ):
+            await service_with_history.check_account(account)
+
+        mock_history_manager.record_check.assert_called_once()
+        mock_history_manager.save.assert_called_once()
+
+    def test_get_account_history_stats(
+        self,
+        service_with_history: ActivityTrackerService,
+        mock_history_manager: MagicMock,
+    ) -> None:
+        """Test getting history stats for an account."""
+        # Mock some records
+        mock_history_manager.get_account_history.return_value = [
+            MagicMock(),
+            MagicMock(),
+            MagicMock(),
+        ]
+        mock_history_manager.get_skipped_count.return_value = 1
+
+        stats = service_with_history.get_account_history_stats("test_account")
+
+        assert stats["total"] == 3
+        assert stats["skipped"] == 1
+        assert stats["active"] == 2
+
+    def test_get_account_history_stats_no_manager(
+        self, accounts_config: Path
+    ) -> None:
+        """Test history stats without manager returns zeros."""
+        service = ActivityTrackerService(accounts_config_path=accounts_config)
+
+        stats = service.get_account_history_stats("test_account")
+
+        assert stats == {"total": 0, "skipped": 0, "active": 0}
+
+    @pytest.mark.asyncio
+    async def test_save_state_saves_history(
+        self,
+        service_with_history: ActivityTrackerService,
+        mock_history_manager: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test save_state also saves history."""
+        await service_with_history.save_state()
+
+        mock_state_manager.save.assert_called_once()
+        mock_history_manager.save.assert_called_once()
+
+
+class TestEventInfoExtraction:
+    """Tests for event info extraction during tracking."""
+
+    @pytest.fixture
+    def post_with_date(self) -> InstagramPost:
+        """Create a post with date in caption."""
+        return InstagramPost(
+            id="12345",
+            url="https://www.instagram.com/p/ABC123/",
+            caption="Trek al Cocuy - 15 de agosto 2026",
+            timestamp=datetime(2025, 1, 15, 10, 30),
+            image_urls=["https://example.com/image1.jpg"],
+        )
+
+    @pytest.fixture
+    def mock_history_for_event_test(self) -> MagicMock:
+        """Create a mock history manager for event extraction test."""
+        manager = MagicMock()
+        manager.should_check.return_value = True
+        manager.record_check = MagicMock()
+        manager.save = MagicMock()
+        manager.load = MagicMock()
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_alert_contains_event_info(
+        self,
+        accounts_config: Path,
+        wishlist_config: Path,
+        mock_scraper: AsyncMock,
+        post_with_date: InstagramPost,
+        mock_history_for_event_test: MagicMock,
+    ) -> None:
+        """Test that alerts include extracted event info."""
+        mock_scraper.scrape.return_value = [post_with_date]
+
+        service = ActivityTrackerService(
+            accounts_config_path=accounts_config,
+            wishlist_config_path=wishlist_config,
+            scraper=mock_scraper,
+            history_manager=mock_history_for_event_test,
+            use_ocr=False,
+        )
+
+        with patch.object(
+            service._inventory,
+            "match_post",
+            return_value=MatchResult(
+                is_wishlist_match=True,
+                matched_destination="Cocuy",
+                is_already_done=False,
+                match_score=0.9,
+            ),
+        ):
+            alerts = await service.check_account(
+                InstagramAccountConfig(username="test", name="Test", enabled=True)
+            )
+
+        assert len(alerts) == 1
+        alert = alerts[0]
+        # Event info should be extracted from caption
+        assert alert.event_date == "2026-08-15"
+        assert "cocuy" in alert.event_id.lower()
