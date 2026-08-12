@@ -1,3 +1,8 @@
+# Flight Price Tracker
+# NOTE: All prices are ONE-WAY (solo ida), not round-trip
+# Currency: COP (Colombian Pesos)
+# Routes: BAQ (Barranquilla), CTG (Cartagena) → MDE (Medellín)
+
 updated_at: '2026-08-12T10:42:21.987171'
 routes:
   BAQ-MDE_2026-08-14:
