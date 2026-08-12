@@ -178,3 +178,11 @@ data/agencies/
 
 # Keep events.db for price history (but ignore during dev)
 # *.db is already ignored above
+
+
+# Generated data folder (all of data/)
+data/
+
+# Manual test scripts (not unit tests)  
+scripts/test_*.py
+docs/

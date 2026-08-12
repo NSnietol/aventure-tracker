@@ -109,7 +109,13 @@ class WishlistConfig(BaseModel):
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        return cls.model_validate(data or {"destinations": []})
+        # Handle empty or null destinations
+        if data is None:
+            data = {"destinations": []}
+        elif data.get("destinations") is None:
+            data["destinations"] = []
+
+        return cls.model_validate(data)
 
     def get_normalized_destinations(self) -> set[str]:
         """Get destinations as lowercase set for matching.
@@ -141,7 +147,13 @@ class DoneConfig(BaseModel):
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        return cls.model_validate(data or {"activities": []})
+        # Handle empty or null activities
+        if data is None:
+            data = {"activities": []}
+        elif data.get("activities") is None:
+            data["activities"] = []
+
+        return cls.model_validate(data)
 
     def get_normalized_activities(self) -> set[str]:
         """Get activities as lowercase set for matching.
