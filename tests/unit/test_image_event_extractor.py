@@ -1,4 +1,4 @@
-"""Tests for image event extractor with local Tesseract OCR."""
+"""Tests for image event extractor with local Ollama vision model."""
 
 from datetime import date
 from pathlib import Path
@@ -18,15 +18,6 @@ def extractor() -> ImageEventExtractor:
     return ImageEventExtractor()
 
 
-@pytest.fixture
-def sample_ocr_data() -> dict:
-    """Sample Tesseract OCR data."""
-    return {
-        "text": ["CAVERNAS", "DEL", "NUS", "1", "AGO", "$195.000"],
-        "conf": [85, 90, 88, 95, 92, 80],
-    }
-
-
 class TestExtractionConfig:
     """Tests for ExtractionConfig."""
 
@@ -35,14 +26,16 @@ class TestExtractionConfig:
         config = ExtractionConfig()
         assert config.year == 2026
         assert config.default_month == "agosto"
-        assert config.tesseract_lang == "spa"
-        assert config.preprocess is True
+        assert config.ollama_model == "minicpm-v"
+        assert config.ollama_url == "http://localhost:11434"
+        assert config.timeout == 120
 
     def test_custom_values(self) -> None:
         """Should accept custom values."""
-        config = ExtractionConfig(year=2025, default_month="septiembre")
+        config = ExtractionConfig(year=2025, default_month="septiembre", ollama_model="llava")
         assert config.year == 2025
         assert config.default_month == "septiembre"
+        assert config.ollama_model == "llava"
 
 
 class TestImageEventExtractor:
@@ -58,173 +51,153 @@ class TestImageEventExtractor:
         assert extractor._get_month_number("diciembre") == 12
         assert extractor._get_month_number("unknown") == 8  # Default
 
-    def test_check_sold_out(self, extractor: ImageEventExtractor) -> None:
-        """Should detect sold out indicators."""
-        assert extractor._check_sold_out("Evento AGOTADO") is True
-        assert extractor._check_sold_out("SOLD OUT") is True
-        assert extractor._check_sold_out("Cupos llenos") is True
-        assert extractor._check_sold_out("Trip completo") is True
-        assert extractor._check_sold_out("Disponible") is False
-
-    def test_is_cover_image(self, extractor: ImageEventExtractor) -> None:
-        """Should detect cover images."""
-        cover_text = "AGOSTO\nEXPERIENCIAS BRUTAL\n2026"
-        assert extractor._is_cover_image(cover_text) is True
-
-        event_text = "CAVERNAS $195.000\nTATACOA $490.000"
-        assert extractor._is_cover_image(event_text) is False
-
-    def test_extract_name(self, extractor: ImageEventExtractor) -> None:
-        """Should extract event name from line."""
-        import re
-
-        line = "CAVERNAS DEL NUS 1 AGO $195.000"
-        price_match = re.search(r"\$[\d.]+", line)
-        date_match = re.search(r"\d+\s*AGO", line)
-
-        name = extractor._extract_name(line, price_match, date_match)
-        assert "CAVERNAS" in name
-
-    def test_parse_line_with_price_and_date(
-        self, extractor: ImageEventExtractor
-    ) -> None:
-        """Should parse line with price and date."""
-        line = "CAVERNAS DEL NUS 1 AGO $195.000"
-
-        event = extractor._parse_line(
-            line,
-            agency="brutaltravel",
-            month_num=8,
-            source_image=Path("test.jpg"),
-            base_confidence=85,
+    def test_create_event_valid(self, extractor: ImageEventExtractor) -> None:
+        """Should create event from valid data."""
+        item = {
+            "name": "Cavernas del Nus",
+            "date_start": 15,
+            "date_end": 17,
+            "month": "agosto",
+            "price": 195000,
+            "sold_out": False,
+        }
+        event = extractor._create_event(
+            item, agency="brutal", default_month="agosto", source_image=Path("test.jpg")
         )
-
         assert event is not None
+        assert event.name == "Cavernas del Nus"
+        assert event.date_start == date(2026, 8, 15)
+        assert event.date_end == date(2026, 8, 17)
         assert event.price == 195000
-        assert event.date_start.day == 1
-        assert event.date_start.month == 8
+        assert event.sold_out is False
 
-    def test_parse_line_date_range(self, extractor: ImageEventExtractor) -> None:
-        """Should parse date ranges."""
-        line = "TATACOA 21 al 23 AGO $490.000"
-
-        event = extractor._parse_line(
-            line,
-            agency="brutaltravel",
-            month_num=8,
-            source_image=Path("test.jpg"),
-            base_confidence=85,
+    def test_create_event_invalid_name(self, extractor: ImageEventExtractor) -> None:
+        """Should return None for invalid name."""
+        item = {"name": "", "date_start": 15, "price": 195000}
+        event = extractor._create_event(
+            item, agency="brutal", default_month="agosto", source_image=Path("test.jpg")
         )
-
-        assert event is not None
-        assert event.date_start.day == 21
-        assert event.date_end.day == 23
-        assert event.is_multi_day is True
-
-    def test_parse_line_no_price(self, extractor: ImageEventExtractor) -> None:
-        """Should return None if no price found."""
-        line = "CAVERNAS DEL NUS 1 AGO"
-
-        event = extractor._parse_line(
-            line,
-            agency="brutaltravel",
-            month_num=8,
-            source_image=Path("test.jpg"),
-            base_confidence=85,
-        )
-
         assert event is None
 
-    def test_parse_line_sets_confidence(self, extractor: ImageEventExtractor) -> None:
-        """Should set confidence scores."""
-        line = "CAVERNAS DEL NUS 1 AGO $195.000"
-
-        event = extractor._parse_line(
-            line,
-            agency="brutaltravel",
-            month_num=8,
-            source_image=Path("test.jpg"),
-            base_confidence=85,
+    def test_create_event_invalid_date(self, extractor: ImageEventExtractor) -> None:
+        """Should return None for invalid date."""
+        item = {"name": "Test", "date_start": 0, "price": 195000}
+        event = extractor._create_event(
+            item, agency="brutal", default_month="agosto", source_image=Path("test.jpg")
         )
+        assert event is None
 
+    def test_create_event_string_price(self, extractor: ImageEventExtractor) -> None:
+        """Should handle string price."""
+        item = {
+            "name": "Test Event",
+            "date_start": 10,
+            "month": "agosto",
+            "price": "$195.000",
+        }
+        event = extractor._create_event(
+            item, agency="brutal", default_month="agosto", source_image=Path("test.jpg")
+        )
+        assert event is not None
+        assert event.price == 195000
+
+    def test_create_event_sets_confidence(self, extractor: ImageEventExtractor) -> None:
+        """Should set confidence scores."""
+        item = {
+            "name": "Test",
+            "date_start": 10,
+            "month": "agosto",
+            "price": 195000,
+        }
+        event = extractor._create_event(
+            item, agency="brutal", default_month="agosto", source_image=Path("test.jpg")
+        )
         assert event is not None
         assert event.get_confidence("name") is not None
         assert event.get_confidence("price") is not None
         assert event.get_confidence("date_start") is not None
 
-    @patch("aventure_tracker.services.image_event_extractor.pytesseract")
-    @patch("aventure_tracker.services.image_event_extractor.ImageEnhance")
-    @patch("aventure_tracker.services.image_event_extractor.Image")
+    def test_parse_response_valid_json(self, extractor: ImageEventExtractor) -> None:
+        """Should parse valid JSON response."""
+        raw_text = """
+        [
+            {"name": "Cavernas", "date_start": 1, "month": "agosto", "price": 195000},
+            {"name": "Tatacoa", "date_start": 21, "date_end": 23, "month": "agosto", "price": 490000}
+        ]
+        """
+        events = extractor._parse_response(
+            raw_text, agency="brutal", month="agosto", source_image=Path("test.jpg")
+        )
+        assert len(events) == 2
+        assert events[0].name == "Cavernas"
+        assert events[1].name == "Tatacoa"
+
+    def test_parse_response_empty_array(self, extractor: ImageEventExtractor) -> None:
+        """Should handle empty array (cover image)."""
+        raw_text = "[]"
+        events = extractor._parse_response(
+            raw_text, agency="brutal", month="agosto", source_image=Path("test.jpg")
+        )
+        assert len(events) == 0
+
+    def test_parse_response_invalid_json(self, extractor: ImageEventExtractor) -> None:
+        """Should handle invalid JSON gracefully."""
+        raw_text = "This is not JSON"
+        events = extractor._parse_response(
+            raw_text, agency="brutal", month="agosto", source_image=Path("test.jpg")
+        )
+        assert len(events) == 0
+
+    def test_parse_response_json_in_text(self, extractor: ImageEventExtractor) -> None:
+        """Should extract JSON from surrounding text."""
+        raw_text = """
+        Here are the events I found:
+        [{"name": "Test", "date_start": 5, "month": "agosto", "price": 100000}]
+        That's all!
+        """
+        events = extractor._parse_response(
+            raw_text, agency="brutal", month="agosto", source_image=Path("test.jpg")
+        )
+        assert len(events) == 1
+
+    @patch("aventure_tracker.services.image_event_extractor.requests.post")
     def test_extract_from_image_success(
         self,
-        mock_image: MagicMock,
-        mock_enhance: MagicMock,
-        mock_tesseract: MagicMock,
+        mock_post: MagicMock,
         extractor: ImageEventExtractor,
         tmp_path: Path,
     ) -> None:
         """Should extract events from image."""
-        # Setup mocks - return a real-ish mock that can be processed
-        mock_img = MagicMock()
-        mock_img.mode = "RGB"
-        mock_img.convert.return_value = mock_img
-        mock_img.filter.return_value = mock_img
-        mock_img.point.return_value = mock_img
-        mock_image.open.return_value = mock_img
-        
-        # Mock ImageEnhance.Contrast
-        mock_contrast = MagicMock()
-        mock_contrast.enhance.return_value = mock_img
-        mock_enhance.Contrast.return_value = mock_contrast
-
-        mock_tesseract.image_to_string.return_value = (
-            "CAVERNAS DEL NUS 1 AGO $195.000\n"
-            "TATACOA 21 al 23 AGO $490.000"
-        )
-        mock_tesseract.image_to_data.return_value = {
-            "conf": [85, 90, 88, 95, 80],
+        # Setup mock response
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "response": '[{"name": "Test Event", "date_start": 10, "month": "agosto", "price": 150000}]'
         }
-        mock_tesseract.Output.DICT = "dict"
+        mock_post.return_value = mock_response
 
+        # Create test image
         image_path = tmp_path / "calendar.jpg"
-        image_path.write_bytes(b"fake image")
+        image_path.write_bytes(b"fake image data")
 
         result = extractor.extract_from_image(
             image_path, agency="brutaltravel", month="agosto"
         )
 
         assert result.success is True
-        assert len(result.events) >= 1
+        assert len(result.events) == 1
+        assert result.events[0].name == "Test Event"
 
-    @patch("aventure_tracker.services.image_event_extractor.pytesseract")
-    @patch("aventure_tracker.services.image_event_extractor.ImageEnhance")
-    @patch("aventure_tracker.services.image_event_extractor.Image")
+    @patch("aventure_tracker.services.image_event_extractor.requests.post")
     def test_extract_from_image_cover(
         self,
-        mock_image: MagicMock,
-        mock_enhance: MagicMock,
-        mock_tesseract: MagicMock,
+        mock_post: MagicMock,
         extractor: ImageEventExtractor,
         tmp_path: Path,
     ) -> None:
         """Should return empty for cover images."""
-        mock_img = MagicMock()
-        mock_img.mode = "RGB"
-        mock_img.convert.return_value = mock_img
-        mock_img.filter.return_value = mock_img
-        mock_img.point.return_value = mock_img
-        mock_image.open.return_value = mock_img
-        
-        # Mock ImageEnhance.Contrast
-        mock_contrast = MagicMock()
-        mock_contrast.enhance.return_value = mock_img
-        mock_enhance.Contrast.return_value = mock_contrast
-
-        mock_tesseract.image_to_string.return_value = (
-            "AGOSTO\nEXPERIENCIAS BRUTAL\n2026"
-        )
-        mock_tesseract.image_to_data.return_value = {"conf": [90, 85, 88]}
-        mock_tesseract.Output.DICT = "dict"
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"response": "[]"}
+        mock_post.return_value = mock_response
 
         image_path = tmp_path / "cover.jpg"
         image_path.write_bytes(b"fake image")
@@ -236,17 +209,36 @@ class TestImageEventExtractor:
         assert result.success is True
         assert len(result.events) == 0
 
-    @patch("aventure_tracker.services.image_event_extractor.pytesseract")
-    @patch("aventure_tracker.services.image_event_extractor.Image")
-    def test_extract_from_image_error(
+    @patch("aventure_tracker.services.image_event_extractor.requests.post")
+    def test_extract_from_image_connection_error(
         self,
-        mock_image: MagicMock,
-        mock_tesseract: MagicMock,
+        mock_post: MagicMock,
         extractor: ImageEventExtractor,
         tmp_path: Path,
     ) -> None:
-        """Should handle OCR errors gracefully."""
-        mock_image.open.side_effect = Exception("Cannot open image")
+        """Should handle Ollama not running."""
+        import requests
+        mock_post.side_effect = requests.exceptions.ConnectionError()
+
+        image_path = tmp_path / "test.jpg"
+        image_path.write_bytes(b"fake image")
+
+        result = extractor.extract_from_image(
+            image_path, agency="brutaltravel", month="agosto"
+        )
+
+        assert result.success is False
+        assert "Ollama not running" in result.error
+
+    @patch("aventure_tracker.services.image_event_extractor.requests.post")
+    def test_extract_from_image_error(
+        self,
+        mock_post: MagicMock,
+        extractor: ImageEventExtractor,
+        tmp_path: Path,
+    ) -> None:
+        """Should handle extraction errors gracefully."""
+        mock_post.side_effect = Exception("API Error")
 
         image_path = tmp_path / "bad.jpg"
         image_path.write_bytes(b"not an image")
@@ -256,50 +248,42 @@ class TestImageEventExtractor:
         )
 
         assert result.success is False
-        assert "OCR error" in result.error
+        assert "Extraction error" in result.error
 
-    @patch("aventure_tracker.services.image_event_extractor.pytesseract")
-    @patch("aventure_tracker.services.image_event_extractor.ImageEnhance")
-    @patch("aventure_tracker.services.image_event_extractor.Image")
+    @patch("aventure_tracker.services.image_event_extractor.requests.post")
     def test_extract_from_directory(
         self,
-        mock_image: MagicMock,
-        mock_enhance: MagicMock,
-        mock_tesseract: MagicMock,
+        mock_post: MagicMock,
         extractor: ImageEventExtractor,
         tmp_path: Path,
     ) -> None:
         """Should process all images in directory."""
-        mock_img = MagicMock()
-        mock_img.mode = "RGB"
-        mock_img.convert.return_value = mock_img
-        mock_img.filter.return_value = mock_img
-        mock_img.point.return_value = mock_img
-        mock_image.open.return_value = mock_img
-        
-        # Mock ImageEnhance.Contrast
-        mock_contrast = MagicMock()
-        mock_contrast.enhance.return_value = mock_img
-        mock_enhance.Contrast.return_value = mock_contrast
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "response": '[{"name": "Event", "date_start": 1, "month": "agosto", "price": 100000}]'
+        }
+        mock_post.return_value = mock_response
 
-        mock_tesseract.image_to_string.return_value = "EVENT 1 AGO $100.000"
-        mock_tesseract.image_to_data.return_value = {"conf": [85]}
-        mock_tesseract.Output.DICT = "dict"
-
-        # Create test images
+        # Create test images (including .txt which may be renamed jpegs)
         (tmp_path / "cal1.jpg").write_bytes(b"img1")
-        (tmp_path / "cal2.jpg").write_bytes(b"img2")
-        (tmp_path / "readme.txt").write_text("not an image")
+        (tmp_path / "cal2.txt").write_bytes(b"img2")  # .txt included for renamed jpegs
+        (tmp_path / "readme.md").write_text("not an image")
 
         results = extractor.extract_from_directory(
             tmp_path, agency="brutaltravel", month="agosto"
         )
 
-        assert len(results) == 2  # Only .jpg files
+        assert len(results) == 2  # .jpg and .txt files
 
-    def test_preprocess_disabled(self, tmp_path: Path) -> None:
-        """Should skip preprocessing when disabled."""
-        config = ExtractionConfig(preprocess=False)
+    def test_custom_config(self, tmp_path: Path) -> None:
+        """Should use custom config."""
+        config = ExtractionConfig(
+            year=2025,
+            default_month="septiembre",
+            ollama_model="llava",
+            timeout=60,
+        )
         extractor = ImageEventExtractor(config=config)
 
-        assert extractor.config.preprocess is False
+        assert extractor.config.year == 2025
+        assert extractor.config.ollama_model == "llava"
