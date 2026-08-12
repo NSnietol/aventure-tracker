@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from aventure_tracker.infrastructure.notifier import TelegramNotifier
@@ -161,11 +161,19 @@ class FlightTrackerService:
             result.routes_checked += 1
 
             for weekend in weekends:
-                # Check both Thursday evening and Friday for each weekend
-                thursday = weekend.thursday
-                friday = weekend.outbound_date
+                # Determine which dates to check based on route direction
+                # Outbound (to MDE): Thursday + Friday
+                # Return (from MDE): Sunday + Monday
+                if route.destination == "MDE":
+                    # Outbound flights: Thursday evening or Friday
+                    dates_to_check = [weekend.thursday, weekend.friday]
+                else:
+                    # Return flights: Sunday or Monday morning
+                    sunday = weekend.return_date
+                    monday = weekend.return_date + timedelta(days=1)
+                    dates_to_check = [sunday, monday]
 
-                for travel_date in [thursday, friday]:
+                for travel_date in dates_to_check:
                     result.dates_checked += 1
 
                     try:
