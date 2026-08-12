@@ -173,16 +173,13 @@ temp/
 # Raw calendar images from WhatsApp (input folder)
 agent-calendars/
 
-# Processed agency data (images + extracted events)
-data/agencies/
-
-# Keep events.db for price history (but ignore during dev)
-# *.db is already ignored above
-
-
-# Generated data folder (all of data/)
-data/
-
 # Manual test scripts (not unit tests)  
 scripts/test_*.py
+
+# Research docs (not essential)
 docs/
+
+# Ignore activity history (personal tracking state)
+data/activity_history.yaml
+
+# Track flight_prices.yaml and agencies/ (important data)
