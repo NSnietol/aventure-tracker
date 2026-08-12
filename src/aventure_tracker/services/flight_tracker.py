@@ -161,30 +161,36 @@ class FlightTrackerService:
             result.routes_checked += 1
 
             for weekend in weekends:
-                travel_date = weekend.outbound_date
-                result.dates_checked += 1
+                # Check both Thursday evening and Friday for each weekend
+                thursday = weekend.thursday
+                friday = weekend.outbound_date
 
-                try:
-                    price = await scraper.get_cheapest_price(route, travel_date)
+                for travel_date in [thursday, friday]:
+                    result.dates_checked += 1
 
-                    if price is None:
-                        logger.warning(f"No price found for {route} on {travel_date}")
-                        continue
+                    try:
+                        price = await scraper.get_cheapest_price(route, travel_date)
 
-                    alert = self._create_alert(route, travel_date, price)
+                        if price is None:
+                            logger.warning(
+                                f"No price found for {route} on {travel_date}"
+                            )
+                            continue
 
-                    if alert.should_notify:
-                        result.alerts_generated += 1
-                        await self._send_notification(alert)
-                        result.notifications_sent += 1
+                        alert = self._create_alert(route, travel_date, price)
 
-                    # Update state
-                    self._update_price_state(route, travel_date, price)
+                        if alert.should_notify:
+                            result.alerts_generated += 1
+                            await self._send_notification(alert)
+                            result.notifications_sent += 1
 
-                except Exception as e:
-                    error_msg = f"Error checking {route} on {travel_date}: {e}"
-                    logger.error(error_msg)
-                    result.errors.append(error_msg)
+                        # Update state
+                        self._update_price_state(route, travel_date, price)
+
+                    except Exception as e:
+                        error_msg = f"Error checking {route} on {travel_date}: {e}"
+                        logger.error(error_msg)
+                        result.errors.append(error_msg)
 
         logger.info(
             f"Flight tracking complete: {result.routes_checked} routes, "

@@ -156,7 +156,7 @@ class WeekendTrip:
     """Represents a weekend trip with valid travel dates.
 
     Attributes:
-        outbound_date: Date for outbound flight.
+        outbound_date: Date for outbound flight (Friday).
         return_date: Date for return flight.
         is_bridge: Whether this is a bridge weekend (puente).
         outbound_times: Valid time ranges for outbound flights.
@@ -168,6 +168,16 @@ class WeekendTrip:
     is_bridge: bool
     outbound_times: list[TimeRange]
     return_times: list[TimeRange]
+
+    @property
+    def thursday(self) -> date:
+        """Get Thursday before this weekend (for evening departures)."""
+        return self.outbound_date - timedelta(days=1)
+
+    @property
+    def friday(self) -> date:
+        """Get Friday of this weekend (alias for outbound_date)."""
+        return self.outbound_date
 
     def is_valid_outbound_time(self, t: time) -> bool:
         """Check if a time is valid for outbound flight.
