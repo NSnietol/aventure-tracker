@@ -10,6 +10,7 @@ from aventure_tracker.infrastructure.state_manager import StateManager
 from aventure_tracker.models.flight import FlightResult, RouteConfig, RoutesConfig
 from aventure_tracker.scrapers.google_flights import GoogleFlightsScraper
 from aventure_tracker.services.flight_dates import FlightDateCalculator
+from aventure_tracker.services.flight_price_store import FlightPriceStore
 from aventure_tracker.services.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,7 @@ class FlightTrackerService:
         notifier: TelegramNotifier | None = None,
         scraper: GoogleFlightsScraper | None = None,
         weeks_ahead: int = 8,
+        price_store_path: Path | None = None,
     ) -> None:
         """Initialize the flight tracker service.
 
@@ -94,6 +96,7 @@ class FlightTrackerService:
             notifier: TelegramNotifier for alerts (optional).
             scraper: GoogleFlightsScraper instance (optional).
             weeks_ahead: Number of weeks to check ahead.
+            price_store_path: Path to YAML price store (optional).
         """
         self._routes_config_path = routes_config_path
         self._holidays_config_path = holidays_config_path
@@ -104,6 +107,9 @@ class FlightTrackerService:
 
         self._routes: RoutesConfig | None = None
         self._date_calculator: FlightDateCalculator | None = None
+
+        # Initialize local price store
+        self._price_store = FlightPriceStore(path=price_store_path)
 
     def _load_routes(self) -> RoutesConfig:
         """Load routes configuration."""
@@ -184,6 +190,10 @@ class FlightTrackerService:
             f"Flight tracking complete: {result.routes_checked} routes, "
             f"{result.dates_checked} dates, {result.alerts_generated} alerts"
         )
+
+        # Save prices to local YAML store
+        self._price_store.save()
+        logger.info("Flight prices saved to local store")
 
         return result
 
@@ -276,6 +286,13 @@ class FlightTrackerService:
         Returns:
             Previous price or None if not tracked.
         """
+        # First try local price store
+        route_str = f"{route.origin}-{route.destination}"
+        previous = self._price_store.get_previous_price(route_str, travel_date)
+        if previous is not None:
+            return previous
+
+        # Fall back to state manager if configured
         if self._state_manager is None:
             return None
 
@@ -295,11 +312,14 @@ class FlightTrackerService:
             travel_date: Travel date.
             price: Current price.
         """
-        if self._state_manager is None:
-            return
+        # Save to local price store
+        route_str = f"{route.origin}-{route.destination}"
+        self._price_store.set_price(route_str, travel_date, price)
 
-        route_key = route.get_route_key(travel_date)
-        self._state_manager.set_flight_price(route_key, price)
+        # Also update state manager if configured
+        if self._state_manager is not None:
+            route_key = route.get_route_key(travel_date)
+            self._state_manager.set_flight_price(route_key, price)
 
     async def _send_notification(self, alert: PriceAlert) -> None:
         """Send notification for a price alert.
