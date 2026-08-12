@@ -163,7 +163,6 @@ site/
 # =============================================================================
 # Project Specific
 # =============================================================================
-# Add your project-specific ignores here
 
 # Temporary files
 tmp/
@@ -171,7 +170,11 @@ temp/
 *.tmp
 *.temp
 
-# Data files (uncomment if needed)
-# data/
-# *.csv
-# *.parquet
+# Raw calendar images from WhatsApp (input folder)
+agent-calendars/
+
+# Processed agency data (images + extracted events)
+data/agencies/
+
+# Keep events.db for price history (but ignore during dev)
+# *.db is already ignored above
