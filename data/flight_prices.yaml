@@ -1,9 +1,4 @@
-# Flight Price Tracker
-# NOTE: All prices are ONE-WAY (solo ida), not round-trip
-# Currency: COP (Colombian Pesos)
-# Routes: BAQ (Barranquilla), CTG (Cartagena) → MDE (Medellín)
-
-updated_at: '2026-08-12T10:42:21.987171'
+updated_at: '2026-08-12T10:56:08.627259'
 routes:
   BAQ-MDE_2026-08-14:
     route: BAQ-MDE
@@ -27,6 +22,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530194'
     - price: 540040
       checked_at: '2026-08-12T10:38:22.090030'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559655'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997489'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386049'
+    - price: 540040
+      checked_at: '2026-08-12T10:48:07.333058'
   BAQ-MDE_2026-08-21:
     route: BAQ-MDE
     travel_date: '2026-08-21'
@@ -49,6 +52,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530259'
     - price: 300730
       checked_at: '2026-08-12T10:38:34.581583'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559723'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997558'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386134'
+    - price: 300730
+      checked_at: '2026-08-12T10:48:19.053338'
   CTG-MDE_2026-08-14:
     route: CTG-MDE
     travel_date: '2026-08-14'
@@ -71,6 +82,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530319'
     - price: 493130
       checked_at: '2026-08-12T10:40:27.356763'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559782'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997614'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386196'
+    - price: 493130
+      checked_at: '2026-08-12T10:50:09.355795'
   CTG-MDE_2026-08-21:
     route: CTG-MDE
     travel_date: '2026-08-21'
@@ -93,6 +112,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530376'
     - price: 330700
       checked_at: '2026-08-12T10:40:40.388688'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559841'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997674'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386251'
+    - price: 330700
+      checked_at: '2026-08-12T10:50:21.457357'
   BAQ-MDE_2026-08-28:
     route: BAQ-MDE
     travel_date: '2026-08-28'
@@ -101,6 +128,8 @@ routes:
       checked_at: '2026-08-12T10:26:28.803678'
     - price: 208150
       checked_at: '2026-08-12T10:38:47.376150'
+    - price: 208150
+      checked_at: '2026-08-12T10:48:31.536382'
   BAQ-MDE_2026-09-04:
     route: BAQ-MDE
     travel_date: '2026-09-04'
@@ -109,6 +138,8 @@ routes:
       checked_at: '2026-08-12T10:26:35.265882'
     - price: 371200
       checked_at: '2026-08-12T10:38:59.700673'
+    - price: 371200
+      checked_at: '2026-08-12T10:48:43.580493'
   CTG-MDE_2026-08-28:
     route: CTG-MDE
     travel_date: '2026-08-28'
@@ -117,6 +148,8 @@ routes:
       checked_at: '2026-08-12T10:26:54.558451'
     - price: 301298
       checked_at: '2026-08-12T10:40:52.853238'
+    - price: 301298
+      checked_at: '2026-08-12T10:50:34.174634'
   CTG-MDE_2026-09-04:
     route: CTG-MDE
     travel_date: '2026-09-04'
@@ -125,6 +158,8 @@ routes:
       checked_at: '2026-08-12T10:27:00.759864'
     - price: 330700
       checked_at: '2026-08-12T10:41:05.724361'
+    - price: 330700
+      checked_at: '2026-08-12T10:50:47.073602'
   BAQ-MDE_2026-08-13:
     route: BAQ-MDE
     travel_date: '2026-08-13'
@@ -137,6 +172,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530075'
     - price: 495060
       checked_at: '2026-08-12T10:38:15.806497'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559516'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997377'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.385935'
+    - price: 495060
+      checked_at: '2026-08-12T10:48:01.682762'
   BAQ-MDE_2026-08-20:
     route: BAQ-MDE
     travel_date: '2026-08-20'
@@ -149,6 +192,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530230'
     - price: 321440
       checked_at: '2026-08-12T10:38:27.954102'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559693'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997524'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386084'
+    - price: 321440
+      checked_at: '2026-08-12T10:48:13.148436'
   CTG-MDE_2026-08-13:
     route: CTG-MDE
     travel_date: '2026-08-13'
@@ -161,6 +212,14 @@ routes:
       checked_at: '2026-08-12T10:37:51.530290'
     - price: 613080
       checked_at: '2026-08-12T10:40:20.969173'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559755'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997588'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386165'
+    - price: 613080
+      checked_at: '2026-08-12T10:50:03.182025'
   CTG-MDE_2026-08-20:
     route: CTG-MDE
     travel_date: '2026-08-20'
@@ -173,171 +232,475 @@ routes:
       checked_at: '2026-08-12T10:37:51.530347'
     - price: 301298
       checked_at: '2026-08-12T10:40:33.702161'
+    - price: 120000
+      checked_at: '2026-08-12T10:47:37.559813'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:37.997641'
+    - price: 100000
+      checked_at: '2026-08-12T10:47:38.386226'
+    - price: 301298
+      checked_at: '2026-08-12T10:50:15.297648'
   BAQ-MDE_2026-08-27:
     route: BAQ-MDE
     travel_date: '2026-08-27'
     records:
     - price: 175691
       checked_at: '2026-08-12T10:38:41.465674'
+    - price: 175691
+      checked_at: '2026-08-12T10:48:25.116028'
   BAQ-MDE_2026-09-03:
     route: BAQ-MDE
     travel_date: '2026-09-03'
     records:
     - price: 305730
       checked_at: '2026-08-12T10:38:53.243265'
+    - price: 305730
+      checked_at: '2026-08-12T10:48:37.779994'
   BAQ-MDE_2026-09-10:
     route: BAQ-MDE
     travel_date: '2026-09-10'
     records:
     - price: 252921
       checked_at: '2026-08-12T10:39:06.458408'
+    - price: 252921
+      checked_at: '2026-08-12T10:48:49.808374'
   BAQ-MDE_2026-09-11:
     route: BAQ-MDE
     travel_date: '2026-09-11'
     records:
     - price: 259920
       checked_at: '2026-08-12T10:39:12.720168'
+    - price: 259920
+      checked_at: '2026-08-12T10:48:55.378047'
   BAQ-MDE_2026-09-17:
     route: BAQ-MDE
     travel_date: '2026-09-17'
     records:
     - price: 220050
       checked_at: '2026-08-12T10:39:19.205325'
+    - price: 220050
+      checked_at: '2026-08-12T10:49:02.119335'
   BAQ-MDE_2026-09-18:
     route: BAQ-MDE
     travel_date: '2026-09-18'
     records:
     - price: 208150
       checked_at: '2026-08-12T10:39:25.417123'
+    - price: 208150
+      checked_at: '2026-08-12T10:49:08.147849'
   BAQ-MDE_2026-09-24:
     route: BAQ-MDE
     travel_date: '2026-09-24'
     records:
     - price: 208150
       checked_at: '2026-08-12T10:39:31.513181'
+    - price: 208150
+      checked_at: '2026-08-12T10:49:13.841029'
   BAQ-MDE_2026-09-25:
     route: BAQ-MDE
     travel_date: '2026-09-25'
     records:
     - price: 249680
       checked_at: '2026-08-12T10:39:37.410103'
+    - price: 249680
+      checked_at: '2026-08-12T10:49:20.251138'
   BAQ-MDE_2026-10-01:
     route: BAQ-MDE
     travel_date: '2026-10-01'
     records:
     - price: 342056
       checked_at: '2026-08-12T10:39:43.198588'
+    - price: 342056
+      checked_at: '2026-08-12T10:49:26.774735'
   BAQ-MDE_2026-10-02:
     route: BAQ-MDE
     travel_date: '2026-10-02'
     records:
     - price: 406436
       checked_at: '2026-08-12T10:39:49.495259'
+    - price: 406436
+      checked_at: '2026-08-12T10:49:33.233379'
   BAQ-MDE_2026-10-08:
     route: BAQ-MDE
     travel_date: '2026-10-08'
     records:
     - price: 503416
       checked_at: '2026-08-12T10:39:56.040009'
+    - price: 503416
+      checked_at: '2026-08-12T10:49:39.758247'
   BAQ-MDE_2026-10-09:
     route: BAQ-MDE
     travel_date: '2026-10-09'
     records:
     - price: 440706
       checked_at: '2026-08-12T10:40:02.013238'
+    - price: 440706
+      checked_at: '2026-08-12T10:49:45.775640'
   BAQ-MDE_2026-10-15:
     route: BAQ-MDE
     travel_date: '2026-10-15'
     records:
     - price: 173050
       checked_at: '2026-08-12T10:40:08.181010'
+    - price: 173050
+      checked_at: '2026-08-12T10:49:51.707805'
   BAQ-MDE_2026-10-16:
     route: BAQ-MDE
     travel_date: '2026-10-16'
     records:
     - price: 249680
       checked_at: '2026-08-12T10:40:14.216777'
+    - price: 249680
+      checked_at: '2026-08-12T10:49:57.292822'
   CTG-MDE_2026-08-27:
     route: CTG-MDE
     travel_date: '2026-08-27'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:40:46.458530'
+    - price: 301298
+      checked_at: '2026-08-12T10:50:27.991545'
   CTG-MDE_2026-09-03:
     route: CTG-MDE
     travel_date: '2026-09-03'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:40:59.004930'
+    - price: 301298
+      checked_at: '2026-08-12T10:50:40.847738'
   CTG-MDE_2026-09-10:
     route: CTG-MDE
     travel_date: '2026-09-10'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:12.141306'
+    - price: 301298
+      checked_at: '2026-08-12T10:50:52.873405'
   CTG-MDE_2026-09-11:
     route: CTG-MDE
     travel_date: '2026-09-11'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:18.075521'
+    - price: 301298
+      checked_at: '2026-08-12T10:50:59.689260'
   CTG-MDE_2026-09-17:
     route: CTG-MDE
     travel_date: '2026-09-17'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:24.791609'
+    - price: 301298
+      checked_at: '2026-08-12T10:51:05.501350'
   CTG-MDE_2026-09-18:
     route: CTG-MDE
     travel_date: '2026-09-18'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:30.829143'
+    - price: 301298
+      checked_at: '2026-08-12T10:51:11.123989'
   CTG-MDE_2026-09-24:
     route: CTG-MDE
     travel_date: '2026-09-24'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:37.429067'
+    - price: 301298
+      checked_at: '2026-08-12T10:51:17.558563'
   CTG-MDE_2026-09-25:
     route: CTG-MDE
     travel_date: '2026-09-25'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:44.327210'
+    - price: 301298
+      checked_at: '2026-08-12T10:51:24.065057'
   CTG-MDE_2026-10-01:
     route: CTG-MDE
     travel_date: '2026-10-01'
     records:
     - price: 280119
       checked_at: '2026-08-12T10:41:50.937035'
+    - price: 280119
+      checked_at: '2026-08-12T10:51:29.712711'
   CTG-MDE_2026-10-02:
     route: CTG-MDE
     travel_date: '2026-10-02'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:41:57.508870'
+    - price: 301298
+      checked_at: '2026-08-12T10:51:35.681261'
   CTG-MDE_2026-10-08:
     route: CTG-MDE
     travel_date: '2026-10-08'
     records:
     - price: 300000
       checked_at: '2026-08-12T10:42:03.923098'
+    - price: 300000
+      checked_at: '2026-08-12T10:51:41.838554'
   CTG-MDE_2026-10-09:
     route: CTG-MDE
     travel_date: '2026-10-09'
     records:
     - price: 317958
       checked_at: '2026-08-12T10:42:09.880726'
+    - price: 317958
+      checked_at: '2026-08-12T10:51:48.337299'
   CTG-MDE_2026-10-15:
     route: CTG-MDE
     travel_date: '2026-10-15'
     records:
     - price: 294880
       checked_at: '2026-08-12T10:42:16.233265'
+    - price: 294880
+      checked_at: '2026-08-12T10:51:53.942857'
   CTG-MDE_2026-10-16:
     route: CTG-MDE
     travel_date: '2026-10-16'
     records:
     - price: 301298
       checked_at: '2026-08-12T10:42:21.987077'
+    - price: 301298
+      checked_at: '2026-08-12T10:52:00.155273'
+  MDE-BAQ_2026-08-16:
+    route: MDE-BAQ
+    travel_date: '2026-08-16'
+    records:
+    - price: 359786
+      checked_at: '2026-08-12T10:52:05.987838'
+  MDE-BAQ_2026-08-17:
+    route: MDE-BAQ
+    travel_date: '2026-08-17'
+    records:
+    - price: 399860
+      checked_at: '2026-08-12T10:52:11.704420'
+  MDE-BAQ_2026-08-23:
+    route: MDE-BAQ
+    travel_date: '2026-08-23'
+    records:
+    - price: 208150
+      checked_at: '2026-08-12T10:52:18.125187'
+  MDE-BAQ_2026-08-24:
+    route: MDE-BAQ
+    travel_date: '2026-08-24'
+    records:
+    - price: 287788
+      checked_at: '2026-08-12T10:52:23.850231'
+  MDE-BAQ_2026-08-30:
+    route: MDE-BAQ
+    travel_date: '2026-08-30'
+    records:
+    - price: 217221
+      checked_at: '2026-08-12T10:52:29.710386'
+  MDE-BAQ_2026-08-31:
+    route: MDE-BAQ
+    travel_date: '2026-08-31'
+    records:
+    - price: 296971
+      checked_at: '2026-08-12T10:52:35.595628'
+  MDE-BAQ_2026-09-06:
+    route: MDE-BAQ
+    travel_date: '2026-09-06'
+    records:
+    - price: 252921
+      checked_at: '2026-08-12T10:52:41.798785'
+  MDE-BAQ_2026-09-07:
+    route: MDE-BAQ
+    travel_date: '2026-09-07'
+    records:
+    - price: 301690
+      checked_at: '2026-08-12T10:52:47.447174'
+  MDE-BAQ_2026-09-13:
+    route: MDE-BAQ
+    travel_date: '2026-09-13'
+    records:
+    - price: 175691
+      checked_at: '2026-08-12T10:52:53.297213'
+  MDE-BAQ_2026-09-14:
+    route: MDE-BAQ
+    travel_date: '2026-09-14'
+    records:
+    - price: 256162
+      checked_at: '2026-08-12T10:52:59.451145'
+  MDE-BAQ_2026-09-20:
+    route: MDE-BAQ
+    travel_date: '2026-09-20'
+    records:
+    - price: 217221
+      checked_at: '2026-08-12T10:53:05.947644'
+  MDE-BAQ_2026-09-21:
+    route: MDE-BAQ
+    travel_date: '2026-09-21'
+    records:
+    - price: 256162
+      checked_at: '2026-08-12T10:53:12.547564'
+  MDE-BAQ_2026-09-27:
+    route: MDE-BAQ
+    travel_date: '2026-09-27'
+    records:
+    - price: 252211
+      checked_at: '2026-08-12T10:53:18.911206'
+  MDE-BAQ_2026-09-28:
+    route: MDE-BAQ
+    travel_date: '2026-09-28'
+    records:
+    - price: 357166
+      checked_at: '2026-08-12T10:53:25.082121'
+  MDE-BAQ_2026-10-04:
+    route: MDE-BAQ
+    travel_date: '2026-10-04'
+    records:
+    - price: 358236
+      checked_at: '2026-08-12T10:53:30.847543'
+  MDE-BAQ_2026-10-05:
+    route: MDE-BAQ
+    travel_date: '2026-10-05'
+    records:
+    - price: 428712
+      checked_at: '2026-08-12T10:53:36.662349'
+  MDE-BAQ_2026-10-11:
+    route: MDE-BAQ
+    travel_date: '2026-10-11'
+    records:
+    - price: 320756
+      checked_at: '2026-08-12T10:53:43.178138'
+  MDE-BAQ_2026-10-12:
+    route: MDE-BAQ
+    travel_date: '2026-10-12'
+    records:
+    - price: 453290
+      checked_at: '2026-08-12T10:53:49.355079'
+  MDE-BAQ_2026-10-18:
+    route: MDE-BAQ
+    travel_date: '2026-10-18'
+    records:
+    - price: 179470
+      checked_at: '2026-08-12T10:53:56.301391'
+  MDE-BAQ_2026-10-19:
+    route: MDE-BAQ
+    travel_date: '2026-10-19'
+    records:
+    - price: 166620
+      checked_at: '2026-08-12T10:54:02.287777'
+  MDE-CTG_2026-08-16:
+    route: MDE-CTG
+    travel_date: '2026-08-16'
+    records:
+    - price: 373060
+      checked_at: '2026-08-12T10:54:08.117100'
+  MDE-CTG_2026-08-17:
+    route: MDE-CTG
+    travel_date: '2026-08-17'
+    records:
+    - price: 544780
+      checked_at: '2026-08-12T10:54:14.721256'
+  MDE-CTG_2026-08-23:
+    route: MDE-CTG
+    travel_date: '2026-08-23'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:54:20.409380'
+  MDE-CTG_2026-08-24:
+    route: MDE-CTG
+    travel_date: '2026-08-24'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:54:27.173947'
+  MDE-CTG_2026-08-30:
+    route: MDE-CTG
+    travel_date: '2026-08-30'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:54:33.435581'
+  MDE-CTG_2026-08-31:
+    route: MDE-CTG
+    travel_date: '2026-08-31'
+    records:
+    - price: 330700
+      checked_at: '2026-08-12T10:54:40.456149'
+  MDE-CTG_2026-09-06:
+    route: MDE-CTG
+    travel_date: '2026-09-06'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:54:47.090116'
+  MDE-CTG_2026-09-07:
+    route: MDE-CTG
+    travel_date: '2026-09-07'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:54:52.587844'
+  MDE-CTG_2026-09-13:
+    route: MDE-CTG
+    travel_date: '2026-09-13'
+    records:
+    - price: 330700
+      checked_at: '2026-08-12T10:54:59.098759'
+  MDE-CTG_2026-09-14:
+    route: MDE-CTG
+    travel_date: '2026-09-14'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:55:05.956787'
+  MDE-CTG_2026-09-20:
+    route: MDE-CTG
+    travel_date: '2026-09-20'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:55:11.877677'
+  MDE-CTG_2026-09-21:
+    route: MDE-CTG
+    travel_date: '2026-09-21'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:55:17.950189'
+  MDE-CTG_2026-09-27:
+    route: MDE-CTG
+    travel_date: '2026-09-27'
+    records:
+    - price: 294880
+      checked_at: '2026-08-12T10:55:25.361186'
+  MDE-CTG_2026-09-28:
+    route: MDE-CTG
+    travel_date: '2026-09-28'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:55:31.824567'
+  MDE-CTG_2026-10-04:
+    route: MDE-CTG
+    travel_date: '2026-10-04'
+    records:
+    - price: 285359
+      checked_at: '2026-08-12T10:55:38.112697'
+  MDE-CTG_2026-10-05:
+    route: MDE-CTG
+    travel_date: '2026-10-05'
+    records:
+    - price: 317958
+      checked_at: '2026-08-12T10:55:44.579496'
+  MDE-CTG_2026-10-11:
+    route: MDE-CTG
+    travel_date: '2026-10-11'
+    records:
+    - price: 294880
+      checked_at: '2026-08-12T10:55:50.876359'
+  MDE-CTG_2026-10-12:
+    route: MDE-CTG
+    travel_date: '2026-10-12'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:55:56.878125'
+  MDE-CTG_2026-10-18:
+    route: MDE-CTG
+    travel_date: '2026-10-18'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:56:02.507703'
+  MDE-CTG_2026-10-19:
+    route: MDE-CTG
+    travel_date: '2026-10-19'
+    records:
+    - price: 301298
+      checked_at: '2026-08-12T10:56:08.627138'
