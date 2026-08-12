@@ -2,7 +2,7 @@
 
 Coordinates the full extraction flow:
 1. Organize raw images from source directory
-2. Extract events from each image using Claude vision
+2. Extract events from each image using local Tesseract OCR
 3. Save events to YAML for human review
 4. Record events in SQLite for price history tracking
 """
@@ -111,10 +111,7 @@ class ExtractionPipeline:
             year=config.year,
             default_month=config.default_month,
         )
-        self.extractor = ImageEventExtractor(
-            api_key=config.api_key,
-            config=extraction_config,
-        )
+        self.extractor = ImageEventExtractor(config=extraction_config)
 
         self.yaml_store = YAMLEventStore(config.target_dir)
         self.price_db = PriceHistoryDB(config.db_path)
