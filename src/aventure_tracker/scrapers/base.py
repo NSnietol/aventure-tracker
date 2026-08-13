@@ -4,6 +4,8 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
 from typing import AsyncGenerator
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
@@ -77,6 +79,7 @@ class BaseScraper(ABC):
     - Human-like delays
     - Screenshot capture on errors
     - Configurable timeouts
+    - Trace recording for debugging
 
     Subclasses must implement the `scrape` method.
     """
@@ -89,6 +92,8 @@ class BaseScraper(ABC):
         viewports: list[dict] | None = None,
         timeout_ms: int = DEFAULT_TIMEOUT_MS,
         navigation_timeout_ms: int = DEFAULT_NAVIGATION_TIMEOUT_MS,
+        trace_enabled: bool = False,
+        trace_dir: Path | None = None,
     ) -> None:
         """Initialize the base scraper.
 
@@ -99,6 +104,8 @@ class BaseScraper(ABC):
             viewports: List of viewport sizes to use.
             timeout_ms: Default timeout for actions in milliseconds.
             navigation_timeout_ms: Timeout for page navigation in milliseconds.
+            trace_enabled: Enable Playwright trace recording for debugging.
+            trace_dir: Directory to save trace files (default: /tmp/playwright-traces).
         """
         self._headless = headless
         self._slow_mo = slow_mo
@@ -106,10 +113,13 @@ class BaseScraper(ABC):
         self._viewports = viewports or DEFAULT_VIEWPORTS
         self._timeout_ms = timeout_ms
         self._navigation_timeout_ms = navigation_timeout_ms
+        self._trace_enabled = trace_enabled
+        self._trace_dir = trace_dir or Path("/tmp/playwright-traces")
 
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
+        self._trace_path: Path | None = None
 
     @property
     def page(self) -> Page | None:
@@ -120,6 +130,11 @@ class BaseScraper(ABC):
     def is_connected(self) -> bool:
         """Check if browser is connected and page is available."""
         return self._browser is not None and self._page is not None
+
+    @property
+    def last_trace_path(self) -> Path | None:
+        """Get the path to the last saved trace file."""
+        return self._trace_path
 
     def _get_random_user_agent(self) -> str:
         """Get a random user agent from the list."""
@@ -184,6 +199,16 @@ class BaseScraper(ABC):
         else:
             logger.warning("playwright_stealth not available, running without stealth")
 
+        # Start trace recording if enabled
+        if self._trace_enabled:
+            self._trace_dir.mkdir(parents=True, exist_ok=True)
+            await self._context.tracing.start(
+                screenshots=True,
+                snapshots=True,
+                sources=True,
+            )
+            logger.info("Trace recording started")
+
         logger.info(
             f"Browser setup complete: headless={self._headless}, "
             f"viewport={viewport['width']}x{viewport['height']}"
@@ -191,6 +216,16 @@ class BaseScraper(ABC):
 
     async def _teardown_browser(self) -> None:
         """Clean up browser resources."""
+        # Stop trace recording if enabled
+        if self._trace_enabled and self._context:
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                self._trace_path = self._trace_dir / f"trace-{timestamp}.zip"
+                await self._context.tracing.stop(path=str(self._trace_path))
+                logger.info(f"Trace saved to: {self._trace_path}")
+            except Exception as e:
+                logger.warning(f"Failed to save trace: {e}")
+
         if self._page:
             await self._page.close()
             self._page = None
