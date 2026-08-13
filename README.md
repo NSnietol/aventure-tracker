@@ -11,13 +11,15 @@ Sistema local y offline para rastrear vuelos baratos y extraer eventos de calend
   - Alertas cuando precio ≤ umbral ($150,000 COP por trayecto)
 
 - **Calendar Event Extraction**: Extracción de eventos de imágenes de calendarios
-  - Procesamiento con Ollama + minicpm-v (100% local, offline)
+  - Procesamiento con Gemini API (rápido, ~3s/imagen) u Ollama + minicpm-v (100% local)
+  - Cache basado en contenido (SHA256) para evitar reprocesar imágenes
   - Soporte para múltiples agencias de viajes
   - Detección de fechas, precios y destinos
 
 - **Local Storage**: Todo se guarda localmente
   - Precios de vuelos: `data/flight_prices.yaml`
   - Eventos extraídos: `data/events.yaml`
+  - Cache de extracción: `data/extraction_cache.yaml`
   - Sin necesidad de GitHub Gist ni APIs externas
 
 - **Colombian Holidays**: Soporte para puentes (fines de semana largos)
@@ -27,7 +29,8 @@ Sistema local y offline para rastrear vuelos baratos y extraer eventos de calend
 ### Prerequisites
 
 - Python 3.12+
-- [Ollama](https://ollama.ai/) con modelo `minicpm-v`
+- [Ollama](https://ollama.ai/) con modelo `minicpm-v` (opcional, para extracción offline)
+- Gemini API key (opcional, para extracción rápida)
 - Playwright browsers
 
 ### Installation
@@ -50,8 +53,12 @@ playwright install chromium
 # Install Ollama (macOS)
 brew install ollama
 
-# Pull the vision model
+# Pull the vision model (optional, for offline extraction)
 ollama pull minicpm-v
+
+# Set Gemini API key (optional, for fast extraction)
+# Get key from https://aistudio.google.com/apikey
+echo "GEMINI_API_KEY=your_key_here" >> .env
 ```
 
 ### Running
@@ -60,8 +67,17 @@ ollama pull minicpm-v
 # Track flight prices (10 weeks, all routes)
 python src/aventure_tracker/main.py --mode flights --dry-run
 
-# Extract events from agency calendars
+# Extract events from agency calendars (uses Gemini if GEMINI_API_KEY set, else Ollama)
 python scripts/extract_events.py --source agent-calendars/brutal
+
+# Force reprocess (ignore cache)
+python scripts/extract_events.py --source agent-calendars/brutal --force
+
+# View cache statistics
+python scripts/extract_events.py --cache-stats
+
+# Clear cache and reprocess
+python scripts/extract_events.py --source agent-calendars/brutal --clear-cache
 
 # Run with fewer weeks
 python src/aventure_tracker/main.py --mode flights --weeks 4 --dry-run
@@ -150,16 +166,19 @@ agent-calendars/
 ### Run Extraction
 
 ```bash
-# Verifica Ollama, inicia servidor si necesario, extrae eventos
+# Extrae eventos (Gemini si hay API key, sino Ollama)
 python scripts/extract_events.py --source agent-calendars/brutal
+
+# Forzar reprocesamiento (ignora cache)
+python scripts/extract_events.py --source agent-calendars/brutal --force
 ```
 
 El script:
-1. Verifica que Ollama esté instalado
-2. Verifica que el modelo `minicpm-v` esté disponible
-3. Inicia el servidor Ollama si no está corriendo
+1. Verifica cache de imágenes ya procesadas (SHA256 hash)
+2. Si usa Gemini: envía imágenes nuevas a la API (~3s/imagen)
+3. Si usa Ollama: verifica servidor y modelo `minicpm-v` (~9s/imagen)
 4. Procesa cada imagen y extrae eventos
-5. Guarda resultados en `data/events.yaml`
+5. Guarda resultados en `data/events.yaml` y actualiza cache
 
 ## Architecture
 
@@ -175,7 +194,9 @@ aventure-tracker/
 │   │   ├── flight_dates.py     # Cálculo de fechas
 │   │   ├── flight_price_store.py # Persistencia YAML
 │   │   ├── holidays.py         # Festivos colombianos
-│   │   └── image_event_extractor.py # Ollama vision
+│   │   ├── image_event_extractor.py # Ollama vision
+│   │   ├── gemini_event_extractor.py # Gemini API vision
+│   │   └── extraction_cache.py # Cache de imágenes procesadas
 │   └── scrapers/
 │       └── google_flights/     # Scraper de Google Flights
 ├── scripts/
@@ -185,6 +206,7 @@ aventure-tracker/
 │   └── holidays.yaml           # Festivos
 ├── data/
 │   ├── flight_prices.yaml      # Historial de precios (tracked)
+│   ├── extraction_cache.yaml   # Cache de imágenes procesadas
 │   └── agencies/               # Eventos extraídos (tracked)
 └── agent-calendars/            # Imágenes de calendarios
 ```
@@ -229,25 +251,33 @@ ruff format src/ tests/
 
 ### Event Extraction Flow
 
-1. `extract_events.py` valida Ollama y modelo
-2. Para cada imagen en el directorio:
-   - Envía imagen a Ollama (minicpm-v)
-   - Modelo extrae eventos (fecha, destino, precio, descripción)
+1. `extract_events.py` carga cache de imágenes procesadas
+2. Filtra imágenes nuevas (no en cache, basado en SHA256 del contenido)
+3. Si `GEMINI_API_KEY` está configurado:
+   - Usa Gemini API (gemini-2.5-flash-lite, ~3s/imagen)
+4. Si no, usa Ollama:
+   - Valida servidor y modelo `minicpm-v`
+   - Procesa localmente (~9s/imagen)
+5. Para cada imagen nueva:
+   - Extrae eventos (fecha, destino, precio, descripción)
    - Calcula confidence score
-3. Guarda eventos en `data/events.yaml`
+   - Guarda en cache
+6. Guarda eventos en `data/events.yaml`
 
 ## Offline Capabilities
 
 El sistema está diseñado para funcionar sin APIs externas de pago:
 
-| Componente | Solución Offline |
-|------------|------------------|
-| Vision/OCR | Ollama + minicpm-v (local) |
-| Persistencia | YAML files (git tracked) |
-| Web scraping | Playwright (headless) |
+| Componente | Solución Offline | Solución Online |
+|------------|------------------|-----------------|
+| Vision/OCR | Ollama + minicpm-v (local) | Gemini API (gratis, rate limited) |
+| Persistencia | YAML files (git tracked) | - |
+| Web scraping | Playwright (headless) | - |
+| Cache | SHA256 content hash (local) | - |
 
 Solo requiere conexión a internet para:
 - Scraping de Google Flights
+- Gemini API (si se usa en lugar de Ollama)
 - (Opcional) Telegram notifications
 
 ## License
