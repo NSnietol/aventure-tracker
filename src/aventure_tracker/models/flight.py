@@ -8,6 +8,20 @@ import yaml
 from pydantic import BaseModel, Field, field_validator
 
 
+from enum import Enum
+from typing import Literal
+
+
+class SearchDay(str, Enum):
+    """Days of the week for flight search."""
+
+    THURSDAY = "thursday"
+    FRIDAY = "friday"
+    SATURDAY = "saturday"
+    SUNDAY = "sunday"
+    MONDAY = "monday"
+
+
 class RouteConfig(BaseModel):
     """Configuration for a flight route to monitor.
 
@@ -16,6 +30,7 @@ class RouteConfig(BaseModel):
         destination: IATA airport code for arrival (e.g., "MDE").
         price_threshold: Maximum price in COP to trigger notification.
         drop_percentage: Minimum price drop percentage to trigger notification.
+        search_days: Days of the week to search for this route.
     """
 
     origin: str = Field(..., min_length=3, max_length=3, description="Origin airport IATA code")
@@ -25,6 +40,10 @@ class RouteConfig(BaseModel):
     price_threshold: int = Field(..., gt=0, description="Maximum price in COP")
     drop_percentage: int = Field(
         ..., ge=0, le=100, description="Minimum drop percentage to notify"
+    )
+    search_days: list[SearchDay] = Field(
+        default_factory=lambda: [SearchDay.FRIDAY],
+        description="Days to search for flights (relative to weekend Friday)",
     )
 
     @field_validator("origin", "destination", mode="before")
@@ -178,6 +197,39 @@ class WeekendTrip:
     def friday(self) -> date:
         """Get Friday of this weekend (alias for outbound_date)."""
         return self.outbound_date
+
+    @property
+    def saturday(self) -> date:
+        """Get Saturday of this weekend."""
+        return self.outbound_date + timedelta(days=1)
+
+    @property
+    def sunday(self) -> date:
+        """Get Sunday of this weekend (alias for return_date)."""
+        return self.return_date
+
+    @property
+    def monday(self) -> date:
+        """Get Monday after this weekend."""
+        return self.return_date + timedelta(days=1)
+
+    def get_date_for_day(self, day: "SearchDay") -> date:
+        """Get the date for a specific day of this weekend.
+
+        Args:
+            day: The day to get.
+
+        Returns:
+            The date for that day.
+        """
+        day_map = {
+            SearchDay.THURSDAY: self.thursday,
+            SearchDay.FRIDAY: self.friday,
+            SearchDay.SATURDAY: self.saturday,
+            SearchDay.SUNDAY: self.sunday,
+            SearchDay.MONDAY: self.monday,
+        }
+        return day_map[day]
 
     def is_valid_outbound_time(self, t: time) -> bool:
         """Check if a time is valid for outbound flight.

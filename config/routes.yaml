@@ -9,6 +9,7 @@
 #   - destination: Airport IATA code (e.g., MDE for Medellín)
 #   - price_threshold: Maximum price in COP to trigger notification (per leg)
 #   - drop_percentage: Minimum price drop % to trigger notification
+#   - search_days: Days to search (thursday, friday, saturday, sunday, monday)
 
 routes:
   # === OUTBOUND (IDA) - Thursday/Friday ===
@@ -16,19 +17,23 @@ routes:
     destination: MDE
     price_threshold: 150000
     drop_percentage: 15
+    search_days: [thursday, friday]
 
   - origin: CTG
     destination: MDE
     price_threshold: 150000
     drop_percentage: 15
+    search_days: [thursday, friday]
 
   # === RETURN (VUELTA) - Sunday/Monday ===
   - origin: MDE
     destination: BAQ
     price_threshold: 150000
     drop_percentage: 15
+    search_days: [sunday, monday]
 
   - origin: MDE
     destination: CTG
     price_threshold: 150000
     drop_percentage: 15
+    search_days: [sunday, monday]
