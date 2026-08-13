@@ -501,6 +501,7 @@ class TestFlightTrackerResultDataclass:
             dates_checked=16,
             alerts_generated=5,
             notifications_sent=5,
+            prices_found=[],
             errors=[],
         )
 

@@ -129,6 +129,7 @@ class TestOrchestratorIntegration:
                         dates_checked=4,
                         alerts_generated=1,
                         notifications_sent=0,  # No notifier configured
+                        prices_found=[],
                         errors=[],
                     )
                 )
@@ -181,6 +182,7 @@ class TestOrchestratorIntegration:
                     dates_checked=8,
                     alerts_generated=2,
                     notifications_sent=0,
+                    prices_found=[],
                     errors=[],
                 )
             )

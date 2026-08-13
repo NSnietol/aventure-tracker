@@ -47,6 +47,21 @@ class PriceAlert:
 
 
 @dataclass
+class PriceFound:
+    """A price found during a tracking run.
+
+    Attributes:
+        route: Route string (e.g., "BAQ→MDE").
+        travel_date: Date of travel.
+        price: Price in COP.
+    """
+
+    route: str
+    travel_date: date
+    price: int
+
+
+@dataclass
 class FlightTrackerResult:
     """Result of a flight tracking run.
 
@@ -55,6 +70,7 @@ class FlightTrackerResult:
         dates_checked: Number of dates checked.
         alerts_generated: Number of price alerts.
         notifications_sent: Number of notifications sent.
+        prices_found: List of prices found during this run.
         errors: List of error messages.
     """
 
@@ -62,6 +78,7 @@ class FlightTrackerResult:
     dates_checked: int
     alerts_generated: int
     notifications_sent: int
+    prices_found: list[PriceFound]
     errors: list[str]
 
 
@@ -153,6 +170,7 @@ class FlightTrackerService:
             dates_checked=0,
             alerts_generated=0,
             notifications_sent=0,
+            prices_found=[],
             errors=[],
         )
 
@@ -173,10 +191,20 @@ class FlightTrackerService:
                         price = await scraper.get_cheapest_price(route, travel_date)
 
                         if price is None:
-                            logger.warning(
-                                f"No price found for {route} on {travel_date}"
-                            )
+                            logger.info(f"  {route} {travel_date}: No price found")
                             continue
+
+                        # Log the price found
+                        logger.info(f"  {route} {travel_date}: ${price:,} COP")
+
+                        # Track price in result
+                        result.prices_found.append(
+                            PriceFound(
+                                route=str(route),
+                                travel_date=travel_date,
+                                price=price,
+                            )
+                        )
 
                         alert = self._create_alert(route, travel_date, price)
 

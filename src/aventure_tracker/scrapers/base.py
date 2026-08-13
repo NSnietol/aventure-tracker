@@ -22,6 +22,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Track if stealth warning has been shown (to avoid spam)
+_stealth_warning_shown = False
+
 # Default user agents for rotation
 DEFAULT_USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -197,7 +200,10 @@ class BaseScraper(ABC):
             await stealth_async(self._page)
             logger.debug("Stealth mode applied")
         else:
-            logger.warning("playwright_stealth not available, running without stealth")
+            global _stealth_warning_shown
+            if not _stealth_warning_shown:
+                logger.warning("playwright_stealth not available, running without stealth")
+                _stealth_warning_shown = True
 
         # Start trace recording if enabled
         if self._trace_enabled:
