@@ -173,6 +173,9 @@ temp/
 # Raw calendar images from WhatsApp (input folder)
 agent-calendars/
 
+# Inbox for new images to process
+inbox/
+
 # Manual test scripts (not unit tests)  
 scripts/test_*.py
 
