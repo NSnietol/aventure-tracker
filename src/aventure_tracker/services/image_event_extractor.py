@@ -1,17 +1,19 @@
-"""Image event extractor using local Ollama vision model.
+"""Image event extractor using vision models.
 
-Extracts events from calendar images offline using minicpm-v model.
+Extracts events from calendar images using either:
+- Gemini (cloud, fast, free tier available) - default
+- Ollama (local, slower, requires local setup)
 """
 
 import base64
 import json
+import os
 import re
 import time
 from dataclasses import dataclass
 from datetime import date
+from enum import Enum
 from pathlib import Path
-
-import requests
 
 from aventure_tracker.models.extracted_event import (
     ExtractedEvent,
@@ -55,19 +57,30 @@ Ejemplo de respuesta:
 JSON:"""
 
 
+class ModelProvider(Enum):
+    """Available model providers."""
+    GEMINI = "gemini"
+    OLLAMA = "ollama"
+
+
 @dataclass
 class ExtractionConfig:
     """Configuration for image extraction."""
 
     year: int = 2026
     default_month: str = "agosto"
+    provider: ModelProvider = ModelProvider.GEMINI
+    # Gemini settings
+    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_api_key: str | None = None
+    # Ollama settings (fallback)
     ollama_model: str = "minicpm-v"
     ollama_url: str = "http://localhost:11434"
-    timeout: int = 120  # seconds
+    timeout: int = 60  # seconds
 
 
 class ImageEventExtractor:
-    """Extracts events from calendar images using local Ollama vision model."""
+    """Extracts events from calendar images using vision models."""
 
     def __init__(self, config: ExtractionConfig | None = None):
         """Initialize the extractor.
@@ -76,6 +89,23 @@ class ImageEventExtractor:
             config: Extraction configuration.
         """
         self.config = config or ExtractionConfig()
+        self._gemini_model = None
+        
+        # Auto-detect API key from environment
+        if self.config.gemini_api_key is None:
+            self.config.gemini_api_key = os.getenv("GEMINI_API_KEY")
+
+    def _get_gemini_client(self):
+        """Lazy-load Gemini client."""
+        if self._gemini_model is None:
+            from google import genai
+            
+            if not self.config.gemini_api_key:
+                raise ValueError("GEMINI_API_KEY not set")
+            
+            self._gemini_model = genai.Client(api_key=self.config.gemini_api_key)
+        
+        return self._gemini_model
 
     def extract_from_image(
         self,
@@ -95,6 +125,88 @@ class ImageEventExtractor:
         """
         image_path = Path(image_path)
         month = month or self.config.default_month
+        
+        if self.config.provider == ModelProvider.GEMINI:
+            return self._extract_with_gemini(image_path, agency, month)
+        else:
+            return self._extract_with_ollama(image_path, agency, month)
+
+    def _extract_with_gemini(
+        self,
+        image_path: Path,
+        agency: str,
+        month: str,
+    ) -> ExtractionResult:
+        """Extract using Google Gemini API."""
+        start_time = time.time()
+        
+        try:
+            from google.genai import types
+            
+            client = self._get_gemini_client()
+            
+            # Read image as bytes
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+            
+            # Detect mime type
+            mime_type = "image/jpeg"
+            if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+                mime_type = "image/png"
+            
+            # Call Gemini
+            response = client.models.generate_content(
+                model=self.config.gemini_model,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    EXTRACTION_PROMPT,
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=2048,
+                ),
+            )
+            
+            raw_text = response.text
+            
+            # Parse events from response
+            events = self._parse_response(raw_text, agency, month, image_path)
+            
+            processing_time = int((time.time() - start_time) * 1000)
+            
+            return ExtractionResult(
+                source_image=image_path,
+                agency=agency,
+                month=month,
+                year=self.config.year,
+                events=events,
+                raw_text=raw_text,
+                processing_time_ms=processing_time,
+                success=True,
+            )
+            
+        except Exception as e:
+            processing_time = int((time.time() - start_time) * 1000)
+            return ExtractionResult(
+                source_image=image_path,
+                agency=agency,
+                month=month,
+                year=self.config.year,
+                events=[],
+                processing_time_ms=processing_time,
+                success=False,
+                error=f"Gemini error: {e}",
+            )
+
+    def _extract_with_ollama(
+        self,
+        image_path: Path,
+        agency: str,
+        month: str,
+    ) -> ExtractionResult:
+        """Extract using local Ollama API."""
+        import requests
+        
         start_time = time.time()
 
         try:
@@ -175,12 +287,16 @@ class ImageEventExtractor:
         Returns:
             List of ExtractionResult for each image.
         """
+        from aventure_tracker.services.file_organizer import detect_file_type
+        
         directory = Path(directory)
         results: list[ExtractionResult] = []
-        image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".txt"}
 
         for image_path in sorted(directory.iterdir()):
-            if image_path.suffix.lower() in image_extensions:
+            if image_path.name.startswith("."):
+                continue
+            # Use magic bytes detection
+            if detect_file_type(image_path):
                 result = self.extract_from_image(image_path, agency, month)
                 results.append(result)
 
@@ -193,10 +309,10 @@ class ImageEventExtractor:
         month: str,
         source_image: Path,
     ) -> list[ExtractedEvent]:
-        """Parse events from Ollama response.
+        """Parse events from model response.
 
         Args:
-            raw_text: Raw response from Ollama.
+            raw_text: Raw response from model.
             agency: Agency name.
             month: Default month name.
             source_image: Source image path.

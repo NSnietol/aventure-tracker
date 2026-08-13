@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """Script to extract events from calendar images.
 
-This script:
-1. Checks if Ollama is installed
-2. Checks if minicpm-v model is available
-3. Starts Ollama if not running
-4. Organizes images by agency (fixing extensions via magic bytes)
-5. Runs parallel extraction using thread pool
+Uses Gemini (cloud) by default, or Ollama (local) as fallback.
 """
 
-import subprocess
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,87 +13,30 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-
-def check_ollama_installed() -> bool:
-    """Check if Ollama is installed."""
-    try:
-        result = subprocess.run(
-            ["which", "ollama"],
-            capture_output=True,
-            text=True,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-def check_model_available(model: str = "minicpm-v") -> bool:
-    """Check if the required model is downloaded."""
-    try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            text=True,
-        )
-        return model in result.stdout
-    except Exception:
-        return False
-
-
-def check_ollama_running() -> bool:
-    """Check if Ollama server is running."""
-    try:
-        import requests
-        response = requests.get("http://localhost:11434/api/tags", timeout=2)
-        return response.status_code == 200
-    except Exception:
-        return False
-
-
-def start_ollama() -> bool:
-    """Start Ollama server in background."""
-    try:
-        subprocess.Popen(
-            ["ollama", "serve"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        # Wait for it to start
-        for _ in range(10):
-            time.sleep(1)
-            if check_ollama_running():
-                return True
-        return False
-    except Exception:
-        return False
-
-
-def pull_model(model: str = "minicpm-v") -> bool:
-    """Download the model if not available."""
-    print(f"Descargando modelo {model}... (esto puede tomar varios minutos)")
-    try:
-        result = subprocess.run(
-            ["ollama", "pull", model],
-            capture_output=False,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
+# Load .env file
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def process_single_image(args: tuple) -> dict:
     """Process a single image (for thread pool).
     
     Args:
-        args: Tuple of (image_path, extractor, agency, month)
+        args: Tuple of (image_path, agency, month, provider)
     
     Returns:
         Dict with results.
     """
-    from aventure_tracker.services.image_event_extractor import ImageEventExtractor
+    from aventure_tracker.services.image_event_extractor import (
+        ImageEventExtractor,
+        ExtractionConfig,
+        ModelProvider,
+    )
     
-    image_path, agency, month = args
-    extractor = ImageEventExtractor()
+    image_path, agency, month, provider = args
+    
+    config = ExtractionConfig(provider=provider)
+    extractor = ImageEventExtractor(config=config)
     
     result = extractor.extract_from_image(image_path, agency, month)
     
@@ -113,6 +51,7 @@ def run_extraction_parallel(
     agency: str,
     month: str,
     workers: int = 3,
+    provider: str = "gemini",
 ) -> None:
     """Run parallel extraction using thread pool.
     
@@ -121,11 +60,16 @@ def run_extraction_parallel(
         agency: Agency name.
         month: Month name.
         workers: Number of parallel workers.
+        provider: Model provider (gemini or ollama).
     """
     from aventure_tracker.services.file_organizer import detect_file_type
+    from aventure_tracker.services.image_event_extractor import ModelProvider
+    
+    model_provider = ModelProvider.GEMINI if provider == "gemini" else ModelProvider.OLLAMA
     
     print(f"\nProcesando imágenes de: {source_dir}")
-    print(f"Agencia: {agency}, Mes: {month}, Workers: {workers}")
+    print(f"Agencia: {agency}, Mes: {month}")
+    print(f"Provider: {provider}, Workers: {workers}")
     print("-" * 50)
 
     # Collect valid image files
@@ -148,10 +92,9 @@ def run_extraction_parallel(
 
     total_events = 0
     total_time = 0
-    results_list = []
 
     # Prepare args for thread pool
-    task_args = [(img_path, agency, month) for img_path in image_files]
+    task_args = [(img_path, agency, month, model_provider) for img_path in image_files]
 
     start_time = time.time()
 
@@ -167,7 +110,6 @@ def run_extraction_parallel(
             try:
                 data = future.result()
                 result = data["result"]
-                results_list.append(data)
 
                 total_time += result.processing_time_ms
 
@@ -192,7 +134,8 @@ def run_extraction_parallel(
     print(f"TOTAL: {total_events} eventos extraídos")
     print(f"Tiempo de procesamiento: {total_time/1000:.1f}s (sum)")
     print(f"Tiempo real (paralelo):  {wall_time:.1f}s")
-    print(f"Speedup: {total_time/1000/wall_time:.1f}x")
+    if wall_time > 0:
+        print(f"Speedup: {total_time/1000/wall_time:.1f}x")
 
 
 def main() -> int:
@@ -224,49 +167,57 @@ def main() -> int:
         default=3,
         help="Número de threads paralelos (default: 3)",
     )
+    parser.add_argument(
+        "--provider",
+        type=str,
+        choices=["gemini", "ollama"],
+        default="gemini",
+        help="Modelo a usar: gemini (cloud, rápido) u ollama (local, lento)",
+    )
     args = parser.parse_args()
 
-    print("🔍 Verificando dependencias...\n")
+    print("🔍 Verificando configuración...\n")
 
-    # 1. Check Ollama installed
-    if not check_ollama_installed():
-        print("❌ Ollama no está instalado.")
-        print("\nPara instalar Ollama:")
-        print("  macOS:  brew install ollama")
-        print("  Linux:  curl -fsSL https://ollama.com/install.sh | sh")
-        print("  Web:    https://ollama.com/download")
-        return 1
-
-    print("✅ Ollama instalado")
-
-    # 2. Check model available
-    if not check_model_available("minicpm-v"):
-        print("⚠️  Modelo minicpm-v no encontrado")
-        if not pull_model("minicpm-v"):
-            print("❌ No se pudo descargar el modelo")
+    # Check provider requirements
+    if args.provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            print("❌ GEMINI_API_KEY no configurada")
+            print("\n1. Obtén tu API key en: https://aistudio.google.com/apikey")
+            print("2. Agrégala a .env: GEMINI_API_KEY=tu_key_aquí")
             return 1
-    
-    print("✅ Modelo minicpm-v disponible")
-
-    # 3. Check/start Ollama server
-    if not check_ollama_running():
-        print("⏳ Iniciando Ollama server...")
-        if not start_ollama():
-            print("❌ No se pudo iniciar Ollama")
-            print("\nIntenta manualmente: ollama serve")
+        print("✅ Gemini API key configurada")
+    else:
+        # Check Ollama
+        import subprocess
+        try:
+            result = subprocess.run(["which", "ollama"], capture_output=True, text=True)
+            if result.returncode != 0:
+                print("❌ Ollama no está instalado")
+                return 1
+            print("✅ Ollama instalado")
+            
+            import requests
+            try:
+                response = requests.get("http://localhost:11434/api/tags", timeout=2)
+                if response.status_code != 200:
+                    raise Exception()
+                print("✅ Ollama server corriendo")
+            except Exception:
+                print("❌ Ollama server no está corriendo. Ejecuta: ollama serve")
+                return 1
+        except Exception as e:
+            print(f"❌ Error verificando Ollama: {e}")
             return 1
-    
-    print("✅ Ollama server corriendo")
 
-    # 4. Check source directory
+    # Check source directory
     if not args.source.exists():
         print(f"\n❌ Directorio no encontrado: {args.source}")
         print(f"\nCrea el directorio inbox con subdirectorios por agencia:")
         print(f"  mkdir -p inbox/brutal inbox/medellin-bungee")
-        print(f"  # Luego copia las imágenes a cada subdirectorio")
         return 1
 
-    # 5. Discover agencies or use specified one
+    # Discover agencies or use specified one
     if args.agency:
         agencies = [args.agency]
         agency_dirs = [args.source / args.agency]
@@ -279,14 +230,11 @@ def main() -> int:
 
     if not agencies:
         print(f"\n❌ No se encontraron agencias en {args.source}")
-        print(f"\nEstructura esperada:")
-        print(f"  {args.source}/brutal/imagen1.jpg")
-        print(f"  {args.source}/medellin-bungee/imagen2.png")
         return 1
 
     print(f"\n📁 Agencias encontradas: {', '.join(agencies)}")
 
-    # 6. Run extraction for each agency
+    # Run extraction for each agency
     for agency, agency_dir in zip(agencies, agency_dirs):
         if not agency_dir.exists():
             print(f"\n⚠️  Directorio no encontrado: {agency_dir}")
@@ -297,6 +245,7 @@ def main() -> int:
             agency=agency,
             month=args.month,
             workers=args.workers,
+            provider=args.provider,
         )
 
     return 0

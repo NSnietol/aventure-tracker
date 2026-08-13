@@ -1,4 +1,4 @@
-"""Tests for image event extractor with local Ollama vision model."""
+"""Tests for image event extractor with vision models."""
 
 from datetime import date
 from pathlib import Path
@@ -9,13 +9,15 @@ import pytest
 from aventure_tracker.services.image_event_extractor import (
     ExtractionConfig,
     ImageEventExtractor,
+    ModelProvider,
 )
 
 
 @pytest.fixture
 def extractor() -> ImageEventExtractor:
-    """Create an extractor instance."""
-    return ImageEventExtractor()
+    """Create an extractor instance with Ollama provider for testing."""
+    config = ExtractionConfig(provider=ModelProvider.OLLAMA)
+    return ImageEventExtractor(config=config)
 
 
 class TestExtractionConfig:
@@ -26,15 +28,23 @@ class TestExtractionConfig:
         config = ExtractionConfig()
         assert config.year == 2026
         assert config.default_month == "agosto"
+        assert config.provider == ModelProvider.GEMINI  # Default to cloud
+        assert config.gemini_model == "gemini-3.5-flash-lite"
         assert config.ollama_model == "minicpm-v"
         assert config.ollama_url == "http://localhost:11434"
-        assert config.timeout == 120
+        assert config.timeout == 60
 
     def test_custom_values(self) -> None:
         """Should accept custom values."""
-        config = ExtractionConfig(year=2025, default_month="septiembre", ollama_model="llava")
+        config = ExtractionConfig(
+            year=2025,
+            default_month="septiembre",
+            provider=ModelProvider.OLLAMA,
+            ollama_model="llava",
+        )
         assert config.year == 2025
         assert config.default_month == "septiembre"
+        assert config.provider == ModelProvider.OLLAMA
         assert config.ollama_model == "llava"
 
 
@@ -160,19 +170,20 @@ class TestImageEventExtractor:
         )
         assert len(events) == 1
 
-    @patch("aventure_tracker.services.image_event_extractor.requests.post")
-    def test_extract_from_image_success(
+    @patch("requests.post")
+    def test_extract_from_image_success_ollama(
         self,
         mock_post: MagicMock,
         extractor: ImageEventExtractor,
         tmp_path: Path,
     ) -> None:
-        """Should extract events from image."""
+        """Should extract events from image using Ollama."""
         # Setup mock response
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "response": '[{"name": "Test Event", "date_start": 10, "month": "agosto", "price": 150000}]'
         }
+        mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
         # Create test image
@@ -187,7 +198,7 @@ class TestImageEventExtractor:
         assert len(result.events) == 1
         assert result.events[0].name == "Test Event"
 
-    @patch("aventure_tracker.services.image_event_extractor.requests.post")
+    @patch("requests.post")
     def test_extract_from_image_cover(
         self,
         mock_post: MagicMock,
@@ -197,6 +208,7 @@ class TestImageEventExtractor:
         """Should return empty for cover images."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"response": "[]"}
+        mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
         image_path = tmp_path / "cover.jpg"
@@ -209,7 +221,7 @@ class TestImageEventExtractor:
         assert result.success is True
         assert len(result.events) == 0
 
-    @patch("aventure_tracker.services.image_event_extractor.requests.post")
+    @patch("requests.post")
     def test_extract_from_image_connection_error(
         self,
         mock_post: MagicMock,
@@ -230,7 +242,7 @@ class TestImageEventExtractor:
         assert result.success is False
         assert "Ollama not running" in result.error
 
-    @patch("aventure_tracker.services.image_event_extractor.requests.post")
+    @patch("requests.post")
     def test_extract_from_image_error(
         self,
         mock_post: MagicMock,
@@ -250,7 +262,7 @@ class TestImageEventExtractor:
         assert result.success is False
         assert "Extraction error" in result.error
 
-    @patch("aventure_tracker.services.image_event_extractor.requests.post")
+    @patch("requests.post")
     def test_extract_from_directory(
         self,
         mock_post: MagicMock,
@@ -262,28 +274,32 @@ class TestImageEventExtractor:
         mock_response.json.return_value = {
             "response": '[{"name": "Event", "date_start": 1, "month": "agosto", "price": 100000}]'
         }
+        mock_response.raise_for_status = MagicMock()
         mock_post.return_value = mock_response
 
-        # Create test images (including .txt which may be renamed jpegs)
-        (tmp_path / "cal1.jpg").write_bytes(b"img1")
-        (tmp_path / "cal2.txt").write_bytes(b"img2")  # .txt included for renamed jpegs
+        # Create test images with JPEG magic bytes (including .txt which may be renamed jpegs)
+        jpeg_magic = b'\xff\xd8\xff\xe0'
+        (tmp_path / "cal1.jpg").write_bytes(jpeg_magic + b"img1")
+        (tmp_path / "cal2.txt").write_bytes(jpeg_magic + b"img2")  # .txt with JPEG magic bytes
         (tmp_path / "readme.md").write_text("not an image")
 
         results = extractor.extract_from_directory(
             tmp_path, agency="brutaltravel", month="agosto"
         )
 
-        assert len(results) == 2  # .jpg and .txt files
+        assert len(results) == 2  # .jpg and .txt files with JPEG magic bytes
 
     def test_custom_config(self, tmp_path: Path) -> None:
         """Should use custom config."""
         config = ExtractionConfig(
             year=2025,
             default_month="septiembre",
+            provider=ModelProvider.OLLAMA,
             ollama_model="llava",
-            timeout=60,
+            timeout=30,
         )
         extractor = ImageEventExtractor(config=config)
 
         assert extractor.config.year == 2025
+        assert extractor.config.provider == ModelProvider.OLLAMA
         assert extractor.config.ollama_model == "llava"
