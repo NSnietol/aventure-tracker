@@ -127,6 +127,7 @@ class TestOrchestratorIntegration:
                     return_value=FlightTrackerResult(
                         routes_checked=2,
                         dates_checked=4,
+                        flights_found=0,
                         alerts_generated=1,
                         notifications_sent=0,  # No notifier configured
                         prices_found=[],
@@ -180,6 +181,7 @@ class TestOrchestratorIntegration:
                 return_value=FlightTrackerResult(
                     routes_checked=2,
                     dates_checked=8,
+                    flights_found=0,
                     alerts_generated=2,
                     notifications_sent=0,
                     prices_found=[],

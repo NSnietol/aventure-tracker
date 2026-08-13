@@ -232,9 +232,10 @@ class TestFlightPriceStore:
         """Should get lowest prices per route."""
         store = FlightPriceStore(path=tmp_path / "prices.yaml")
 
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-        store.set_price("BAQ-MDE", date(2026, 8, 22), 120000)
-        store.set_price("CTG-MDE", date(2026, 8, 15), 180000)
+        # Use new API with flight details
+        store.set_flight_price("BAQ-MDE", date(2026, 8, 15), "08:00", "LATAM", 150000)
+        store.set_flight_price("BAQ-MDE", date(2026, 8, 22), "10:00", "LATAM", 120000)
+        store.set_flight_price("CTG-MDE", date(2026, 8, 15), "09:00", "AVIANCA", 180000)
 
         lowest = store.get_lowest_prices()
 

@@ -51,6 +51,7 @@ def mock_flight_result() -> FlightTrackerResult:
     return FlightTrackerResult(
         routes_checked=2,
         dates_checked=16,
+        flights_found=0,
         alerts_generated=3,
         notifications_sent=3,
         prices_found=[],
@@ -333,6 +334,7 @@ class TestOrchestratorRun:
                     return_value=FlightTrackerResult(
                         routes_checked=0,
                         dates_checked=0,
+                        flights_found=0,
                         alerts_generated=0,
                         notifications_sent=0,
                         prices_found=[],

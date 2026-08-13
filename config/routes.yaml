@@ -19,11 +19,12 @@ routes:
     drop_percentage: 15
     search_days: [thursday, friday]
 
-  - origin: CTG
-    destination: MDE
-    price_threshold: 150000
-    drop_percentage: 15
-    search_days: [thursday, friday]
+  # CTG-MDE disabled: travel time from Barranquilla not worth it unless very cheap
+  # - origin: CTG
+  #   destination: MDE
+  #   price_threshold: 100000  # Only if <= 100k COP
+  #   drop_percentage: 15
+  #   search_days: [thursday, friday]
 
   # === RETURN (VUELTA) - Sunday/Monday ===
   - origin: MDE
@@ -32,8 +33,9 @@ routes:
     drop_percentage: 15
     search_days: [sunday, monday]
 
-  - origin: MDE
-    destination: CTG
-    price_threshold: 150000
-    drop_percentage: 15
-    search_days: [sunday, monday]
+  # MDE-CTG disabled: return route for CTG (disabled above)
+  # - origin: MDE
+  #   destination: CTG
+  #   price_threshold: 100000
+  #   drop_percentage: 15
+  #   search_days: [sunday, monday]
