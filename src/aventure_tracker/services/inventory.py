@@ -1,16 +1,12 @@
-"""Inventory manager for tracking wishlist and completed activities."""
+"""Inventory manager for activity filtering using blacklist-only approach."""
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
 from aventure_tracker.models.activity import (
-    BlacklistConfig,
-    DoneConfig,
+    DestinationsConfig,
     InstagramPost,
-    WishlistConfig,
 )
 from aventure_tracker.services.ocr import ExtractedActivity
 
@@ -22,43 +18,37 @@ class MatchResult:
     """Result of matching an activity against inventory.
 
     Attributes:
-        is_wishlist_match: Activity matches a wishlist destination.
-        is_already_done: Activity has already been completed.
         is_blacklisted: Activity matches a blacklisted destination.
-        matched_destination: The matching wishlist destination (if any).
-        matched_done: The matching done activity (if any).
         matched_blacklist: The matching blacklisted destination (if any).
+        blacklist_reason: Why it's blacklisted (ya_fue, playa, etc.).
         match_score: Confidence score for the match (0-1).
     """
 
-    is_wishlist_match: bool
-    is_already_done: bool
     is_blacklisted: bool = False
-    matched_destination: str | None = None
-    matched_done: str | None = None
     matched_blacklist: str | None = None
-    match_score: float = 0.0
+    blacklist_reason: str | None = None
+    match_score: float = 1.0
 
     @property
     def should_notify(self) -> bool:
         """Check if this match should trigger a notification."""
-        return self.is_wishlist_match and not self.is_already_done and not self.is_blacklisted
+        return not self.is_blacklisted
 
 
 class InventoryManager:
-    """Manager for wishlist destinations and completed activities.
+    """Manager for activity filtering using blacklist-only approach.
 
-    Handles loading, saving, and matching activities against the user's
-    wishlist, done lists, and blacklist.
+    All activities are shown EXCEPT those matching the blacklist.
+    No wishlist needed - you get everything that's not blocked.
 
     Attributes:
-        wishlist_path: Path to wishlist.yaml file.
-        done_path: Path to done.yaml file.
-        blacklist_path: Path to blacklist.yaml file.
+        destinations_path: Path to destinations.yaml file.
     """
 
     def __init__(
         self,
+        destinations_path: Path | None = None,
+        # Legacy params for backward compatibility
         wishlist_path: Path | None = None,
         done_path: Path | None = None,
         blacklist_path: Path | None = None,
@@ -66,140 +56,60 @@ class InventoryManager:
         """Initialize the inventory manager.
 
         Args:
-            wishlist_path: Path to wishlist.yaml file.
-            done_path: Path to done.yaml file.
-            blacklist_path: Path to blacklist.yaml file.
+            destinations_path: Path to destinations.yaml file (preferred).
+            wishlist_path: DEPRECATED - ignored.
+            done_path: DEPRECATED - ignored.
+            blacklist_path: DEPRECATED - use destinations_path instead.
         """
-        self._wishlist_path = wishlist_path
-        self._done_path = done_path
-        self._blacklist_path = blacklist_path
-        self._wishlist: WishlistConfig | None = None
-        self._done: DoneConfig | None = None
-        self._blacklist: BlacklistConfig | None = None
+        self._destinations_path = destinations_path
+        self._destinations: DestinationsConfig | None = None
+
+        # Log deprecation warnings
+        if wishlist_path:
+            logger.warning("wishlist_path is deprecated, use destinations_path")
+        if done_path:
+            logger.warning("done_path is deprecated, use destinations_path")
+        if blacklist_path:
+            logger.warning("blacklist_path is deprecated, use destinations_path")
 
     def load(self) -> None:
-        """Load wishlist, done, and blacklist configurations from files."""
-        if self._wishlist_path:
-            self._wishlist = WishlistConfig.from_yaml(self._wishlist_path)
+        """Load destinations configuration from file."""
+        if self._destinations_path:
+            self._destinations = DestinationsConfig.from_yaml(self._destinations_path)
             logger.info(
-                f"Loaded {len(self._wishlist.destinations)} wishlist destinations"
+                f"Loaded {len(self._destinations.get_all_blacklisted())} blacklisted destinations"
             )
         else:
-            self._wishlist = WishlistConfig(destinations=[])
-
-        if self._done_path:
-            self._done = DoneConfig.from_yaml(self._done_path)
-            logger.info(f"Loaded {len(self._done.activities)} done activities")
-        else:
-            self._done = DoneConfig(activities=[])
-
-        if self._blacklist_path:
-            self._blacklist = BlacklistConfig.from_yaml(self._blacklist_path)
-            logger.info(
-                f"Loaded {len(self._blacklist.get_all_destinations())} blacklisted destinations"
-            )
-        else:
-            self._blacklist = BlacklistConfig(destinations=[], entries=[])
+            self._destinations = DestinationsConfig(blacklist={})
 
     @property
-    def wishlist(self) -> WishlistConfig:
-        """Get the wishlist configuration."""
-        if self._wishlist is None:
+    def destinations(self) -> DestinationsConfig:
+        """Get the destinations configuration."""
+        if self._destinations is None:
             self.load()
-        return self._wishlist  # type: ignore
+        return self._destinations  # type: ignore
 
     @property
-    def done(self) -> DoneConfig:
-        """Get the done configuration."""
-        if self._done is None:
-            self.load()
-        return self._done  # type: ignore
+    def blacklist(self) -> DestinationsConfig:
+        """Alias for destinations (for compatibility)."""
+        return self.destinations
 
-    @property
-    def blacklist(self) -> BlacklistConfig:
-        """Get the blacklist configuration."""
-        if self._blacklist is None:
-            self.load()
-        return self._blacklist  # type: ignore
-
-    def is_in_wishlist(self, text: str) -> tuple[bool, str | None]:
-        """Check if text matches any wishlist destination.
-
-        Uses case-insensitive partial matching.
-
-        Args:
-            text: Text to search for destinations.
-
-        Returns:
-            Tuple of (is_match, matched_destination).
-        """
-        text_lower = text.lower()
-        for destination in self.wishlist.destinations:
-            dest_lower = destination.lower()
-            if dest_lower in text_lower:
-                return True, destination
-        return False, None
-
-    def is_already_done(self, text: str) -> tuple[bool, str | None]:
-        """Check if text matches any completed activity.
-
-        Uses case-insensitive partial matching. Matches if:
-        - The search text contains the done activity
-        - The done activity contains the search text
-        - They share a common destination keyword
-
-        Args:
-            text: Text to search for done activities.
-
-        Returns:
-            Tuple of (is_done, matched_activity).
-        """
-        text_lower = text.lower()
-
-        for activity in self.done.activities:
-            activity_lower = activity.lower()
-
-            # Check direct containment both ways
-            if activity_lower in text_lower or text_lower in activity_lower:
-                return True, activity
-
-            # Check for common keywords (split on common separators)
-            activity_words = set(
-                w.strip()
-                for w in activity_lower.replace("-", " ").replace(",", " ").split()
-                if len(w.strip()) > 3  # Skip short words like "de", "en"
-            )
-            text_words = set(
-                w.strip()
-                for w in text_lower.replace("-", " ").replace(",", " ").split()
-                if len(w.strip()) > 3
-            )
-
-            # If they share significant words, consider it a match
-            common = activity_words & text_words
-            if common:
-                return True, activity
-
-        return False, None
-
-    def is_blacklisted(self, text: str) -> tuple[bool, str | None]:
+    def is_blacklisted(self, text: str) -> tuple[bool, str | None, str | None]:
         """Check if text matches any blacklisted destination.
-
-        Uses case-insensitive partial matching.
 
         Args:
             text: Text to search for blacklisted destinations.
 
         Returns:
-            Tuple of (is_blacklisted, matched_destination).
+            Tuple of (is_blacklisted, matched_destination, reason).
         """
-        return self.blacklist.is_blacklisted(text)
+        return self.destinations.is_blacklisted(text)
 
     def match_activity(
         self,
         extracted: ExtractedActivity,
     ) -> MatchResult:
-        """Match an extracted activity against inventory.
+        """Match an extracted activity against blacklist.
 
         Args:
             extracted: Activity information extracted from OCR.
@@ -216,26 +126,14 @@ class InventoryManager:
 
         search_text = " ".join(search_parts)
 
-        # Check blacklist first (if blacklisted, skip other checks)
-        is_blocked, matched_blacklist = self.is_blacklisted(search_text)
-
-        # Check wishlist
-        is_wishlist, matched_dest = self.is_in_wishlist(search_text)
-
-        # Check done
-        is_done, matched_done = self.is_already_done(search_text)
-
-        # Calculate match score
-        score = self._calculate_match_score(extracted, is_wishlist)
+        # Check blacklist
+        is_blocked, matched_blacklist, reason = self.is_blacklisted(search_text)
 
         return MatchResult(
-            is_wishlist_match=is_wishlist,
-            is_already_done=is_done,
             is_blacklisted=is_blocked,
-            matched_destination=matched_dest,
-            matched_done=matched_done,
             matched_blacklist=matched_blacklist,
-            match_score=score,
+            blacklist_reason=reason,
+            match_score=extracted.confidence if not is_blocked else 0.0,
         )
 
     def match_post(
@@ -243,7 +141,7 @@ class InventoryManager:
         post: InstagramPost,
         extracted: ExtractedActivity | None = None,
     ) -> MatchResult:
-        """Match an Instagram post against inventory.
+        """Match an Instagram post against blacklist.
 
         Args:
             post: Instagram post to match.
@@ -259,120 +157,30 @@ class InventoryManager:
         # Otherwise, just use the caption
         search_text = post.caption
 
-        is_blocked, matched_blacklist = self.is_blacklisted(search_text)
-        is_wishlist, matched_dest = self.is_in_wishlist(search_text)
-        is_done, matched_done = self.is_already_done(search_text)
-
-        score = 0.5 if is_wishlist else 0.0
+        is_blocked, matched_blacklist, reason = self.is_blacklisted(search_text)
 
         return MatchResult(
-            is_wishlist_match=is_wishlist,
-            is_already_done=is_done,
             is_blacklisted=is_blocked,
-            matched_destination=matched_dest,
-            matched_done=matched_done,
             matched_blacklist=matched_blacklist,
-            match_score=score,
+            blacklist_reason=reason,
+            match_score=1.0 if not is_blocked else 0.0,
         )
 
-    def _calculate_match_score(
-        self,
-        extracted: ExtractedActivity,
-        is_wishlist: bool,
-    ) -> float:
-        """Calculate match score for an extracted activity.
+    def add_to_blacklist(self, destination: str, reason: str = "ya_fue") -> None:
+        """Add a destination to the blacklist.
 
         Args:
-            extracted: Extracted activity information.
-            is_wishlist: Whether it matches a wishlist destination.
-
-        Returns:
-            Match score from 0 to 1.
+            destination: Destination name to blacklist.
+            reason: Reason for blacklisting.
         """
-        if not is_wishlist:
-            return 0.0
-
-        # Base score for wishlist match
-        score = 0.5
-
-        # Add OCR confidence
-        score += extracted.confidence * 0.3
-
-        # Bonus for having location extracted
-        if extracted.location:
-            score += 0.1
-
-        # Bonus for having price
-        if extracted.price:
-            score += 0.1
-
-        return min(score, 1.0)
-
-    def add_to_done(self, activity: str) -> None:
-        """Add an activity to the done list.
-
-        Args:
-            activity: Activity description to add.
-        """
-        if activity not in self.done.activities:
-            self.done.activities.append(activity)
-            logger.info(f"Added to done: {activity}")
-
-    def add_to_wishlist(self, destination: str) -> None:
-        """Add a destination to the wishlist.
-
-        Args:
-            destination: Destination to add.
-        """
-        if destination not in self.wishlist.destinations:
-            self.wishlist.destinations.append(destination)
-            logger.info(f"Added to wishlist: {destination}")
-
-    def remove_from_wishlist(self, destination: str) -> bool:
-        """Remove a destination from the wishlist.
-
-        Args:
-            destination: Destination to remove.
-
-        Returns:
-            True if removed, False if not found.
-        """
-        try:
-            self.wishlist.destinations.remove(destination)
-            logger.info(f"Removed from wishlist: {destination}")
-            return True
-        except ValueError:
-            return False
+        self.destinations.add_to_blacklist(destination, reason)
+        logger.info(f"Added to blacklist ({reason}): {destination}")
 
     def save(self) -> None:
-        """Save wishlist and done configurations to files."""
-        if self._wishlist_path and self._wishlist:
-            self._save_wishlist()
-
-        if self._done_path and self._done:
-            self._save_done()
-
-    def _save_wishlist(self) -> None:
-        """Save wishlist to YAML file."""
-        data = {"destinations": self.wishlist.destinations}
-
-        with open(self._wishlist_path, "w", encoding="utf-8") as f:  # type: ignore
-            f.write("# Wishlist - Destinations of Interest\n")
-            f.write("# Add destinations you want to be notified about.\n\n")
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
-
-        logger.info(f"Saved wishlist to {self._wishlist_path}")
-
-    def _save_done(self) -> None:
-        """Save done activities to YAML file."""
-        data = {"activities": self.done.activities}
-
-        with open(self._done_path, "w", encoding="utf-8") as f:  # type: ignore
-            f.write("# Done - Completed Activities\n")
-            f.write("# Activities you've already done.\n\n")
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
-
-        logger.info(f"Saved done to {self._done_path}")
+        """Save destinations configuration to file."""
+        if self._destinations_path and self._destinations:
+            self._destinations.save(self._destinations_path)
+            logger.info(f"Saved destinations to {self._destinations_path}")
 
     def get_stats(self) -> dict[str, int]:
         """Get inventory statistics.
@@ -381,9 +189,10 @@ class InventoryManager:
             Dictionary with counts.
         """
         return {
-            "wishlist_count": len(self.wishlist.destinations),
-            "done_count": len(self.done.activities),
-            "blacklist_count": len(self.blacklist.get_all_destinations()),
+            "blacklist_count": len(self.destinations.get_all_blacklisted()),
+            "ya_fue_count": len(self.destinations.get_by_reason("ya_fue")),
+            "playa_count": len(self.destinations.get_by_reason("playa")),
+            "no_interesa_count": len(self.destinations.get_by_reason("no_interesa")),
         }
 
     def filter_new_activities(
@@ -391,14 +200,14 @@ class InventoryManager:
         posts: list[InstagramPost],
         extracted_activities: dict[str, ExtractedActivity] | None = None,
     ) -> list[tuple[InstagramPost, MatchResult]]:
-        """Filter posts to find new wishlist-matching activities.
+        """Filter posts to find activities that should be notified.
 
         Args:
             posts: List of Instagram posts to filter.
             extracted_activities: Optional dict mapping post IDs to extracted info.
 
         Returns:
-            List of (post, match_result) tuples for new wishlist matches.
+            List of (post, match_result) tuples for non-blacklisted activities.
         """
         results: list[tuple[InstagramPost, MatchResult]] = []
 
@@ -408,7 +217,7 @@ class InventoryManager:
             )
             match = self.match_post(post, extracted)
 
-            # Include if should notify (wishlist match, not done, not blacklisted)
+            # Include if should notify (not blacklisted)
             if match.should_notify:
                 results.append((post, match))
 

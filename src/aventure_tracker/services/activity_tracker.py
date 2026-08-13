@@ -45,8 +45,8 @@ class ActivityAlert:
 
     @property
     def destination(self) -> str | None:
-        """Get the matched destination."""
-        return self.match.matched_destination
+        """Get the matched/blacklisted destination."""
+        return self.match.matched_blacklist
 
     @property
     def activity_name(self) -> str | None:
@@ -68,7 +68,7 @@ class ActivityTrackerResult:
         posts_found: Total posts found across all accounts.
         posts_processed: Posts processed with OCR.
         posts_skipped: Posts skipped due to history limit (max 3 checks).
-        alerts_generated: Number of alerts for wishlist matches.
+        alerts_generated: Number of alerts for non-blacklisted activities.
         notifications_sent: Number of notifications sent.
         errors: List of error messages.
     """
@@ -85,23 +85,24 @@ class ActivityTrackerResult:
 class ActivityTrackerService:
     """Service for tracking Instagram adventure activities.
 
-    Orchestrates Instagram scraping, OCR processing, inventory matching,
+    Orchestrates Instagram scraping, OCR processing, blacklist filtering,
     and notification sending for adventure activities.
+
+    Uses blacklist-only approach: all activities are shown EXCEPT those
+    matching the blacklist (destinations you've visited or don't want).
 
     Tracks post history to avoid checking the same post more than 3 times.
 
     Attributes:
         accounts_config_path: Path to accounts.yaml configuration.
-        wishlist_config_path: Path to wishlist.yaml configuration.
-        done_config_path: Path to done.yaml configuration.
+        destinations_config_path: Path to destinations.yaml (blacklist config).
         use_ocr: Whether to use OCR for image processing.
     """
 
     def __init__(
         self,
         accounts_config_path: Path,
-        wishlist_config_path: Path | None = None,
-        done_config_path: Path | None = None,
+        destinations_config_path: Path | None = None,
         state_manager: StateManager | None = None,
         notifier: TelegramNotifier | None = None,
         scraper: InstagramScraper | None = None,
@@ -109,13 +110,15 @@ class ActivityTrackerService:
         history_manager: ActivityHistoryManager | None = None,
         use_ocr: bool = True,
         max_posts_per_account: int = 10,
+        # Legacy params for backward compatibility
+        wishlist_config_path: Path | None = None,
+        done_config_path: Path | None = None,
     ) -> None:
         """Initialize the activity tracker service.
 
         Args:
             accounts_config_path: Path to accounts.yaml.
-            wishlist_config_path: Path to wishlist.yaml.
-            done_config_path: Path to done.yaml.
+            destinations_config_path: Path to destinations.yaml (blacklist config).
             state_manager: StateManager for persistence (optional).
             notifier: TelegramNotifier for alerts (optional).
             scraper: InstagramScraper instance (optional).
@@ -123,6 +126,8 @@ class ActivityTrackerService:
             history_manager: ActivityHistoryManager for post history (optional).
             use_ocr: Whether to use OCR processing.
             max_posts_per_account: Maximum posts to fetch per account.
+            wishlist_config_path: DEPRECATED - ignored.
+            done_config_path: DEPRECATED - ignored.
         """
         self._accounts_config_path = accounts_config_path
         self._state_manager = state_manager
@@ -133,10 +138,15 @@ class ActivityTrackerService:
         self._use_ocr = use_ocr
         self._max_posts = max_posts_per_account
 
+        # Log deprecation warnings for legacy params
+        if wishlist_config_path:
+            logger.warning("wishlist_config_path is deprecated, use destinations_config_path")
+        if done_config_path:
+            logger.warning("done_config_path is deprecated, use destinations_config_path")
+
         self._accounts: AccountsConfig | None = None
         self._inventory = InventoryManager(
-            wishlist_path=wishlist_config_path,
-            done_path=done_config_path,
+            destinations_path=destinations_config_path,
         )
 
     def _load_accounts(self) -> AccountsConfig:
@@ -252,12 +262,12 @@ class ActivityTrackerService:
                             event_id=event_info.event_id,
                             event_name=event_info.event_name,
                             event_date=event_info.event_date,
-                            matched_wishlist=match.is_wishlist_match,
-                            destination=match.matched_destination,
+                            matched_wishlist=match.should_notify,  # True if not blacklisted
+                            destination=match.matched_blacklist,  # Blacklisted destination if any
                         )
 
-                    # Generate alert if it's a new wishlist match
-                    if match.is_wishlist_match and not match.is_already_done:
+                    # Generate alert if activity should be notified (not blacklisted)
+                    if match.should_notify:
                         alert = ActivityAlert(
                             post=post,
                             account=account,
@@ -339,11 +349,12 @@ class ActivityTrackerService:
                         event_id=event_info.event_id,
                         event_name=event_info.event_name,
                         event_date=event_info.event_date,
-                        matched_wishlist=match.is_wishlist_match,
-                        destination=match.matched_destination,
+                        matched_wishlist=match.should_notify,  # True if not blacklisted
+                        destination=match.matched_blacklist,  # Blacklisted destination if any
                     )
 
-                if match.is_wishlist_match and not match.is_already_done:
+                # Generate alert if activity should be notified (not blacklisted)
+                if match.should_notify:
                     alert = ActivityAlert(
                         post=post,
                         account=account,
@@ -455,14 +466,14 @@ class ActivityTrackerService:
         accounts = self._load_accounts()
         return accounts.enabled_accounts
 
-    def get_wishlist_destinations(self) -> list[str]:
-        """Get list of wishlist destinations.
+    def get_blacklisted_destinations(self) -> list[str]:
+        """Get list of blacklisted destinations.
 
         Returns:
-            List of destination names.
+            List of blacklisted destination names.
         """
         self._inventory.load()
-        return self._inventory.wishlist.destinations
+        return self._inventory.destinations.get_all_blacklisted()
 
     def get_account_history_stats(self, account: str) -> dict[str, int]:
         """Get history statistics for an account.

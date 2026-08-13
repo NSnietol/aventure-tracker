@@ -338,14 +338,30 @@ class TestServiceIntegration:
         """Test inventory manager loads configuration files."""
         from aventure_tracker.services.inventory import InventoryManager
 
-        inventory = InventoryManager(
-            wishlist_path=integration_config / "wishlist.yaml",
-            done_path=integration_config / "done.yaml",
+        # Create a destinations.yaml file for the test
+        destinations_file = integration_config / "destinations.yaml"
+        destinations_file.write_text(
+            """
+blacklist:
+  ya_fue:
+    - Cerro Tusa
+    - San Luis
+  playa:
+    - Rincón del Mar
+  no_interesa:
+    - avistamiento de ballenas
+"""
         )
+
+        inventory = InventoryManager(destinations_path=destinations_file)
         inventory.load()
 
-        # Check wishlist loaded
-        assert len(inventory.wishlist.destinations) == 4
+        # Check blacklist loaded (normalized to lowercase)
+        all_blacklisted = inventory.destinations.get_all_blacklisted()
+        assert len(all_blacklisted) == 4
+        assert "cerro tusa" in all_blacklisted
+        assert "san luis" in all_blacklisted
 
-        # Check done activities loaded
-        assert len(inventory.done.activities) == 1
+        # Check ya_fue count
+        ya_fue = inventory.destinations.get_by_reason("ya_fue")
+        assert len(ya_fue) == 2

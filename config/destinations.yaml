@@ -1,0 +1,41 @@
+# =============================================================================
+# Destinations Config - Blacklist Only
+# =============================================================================
+# Recibes notificaciones de TODOS los planes EXCEPTO los que están aquí.
+# Agrupados por razón de exclusión.
+
+blacklist:
+  # === Ya visitados ===
+  ya_fue:
+    - Cerro Tusa
+    - San Luis
+    - Concepción
+    - Río Melcocho
+    - Tatacoa
+    - Mutatá
+    - Salto del Buey
+    - Charcos de Tapartó
+    - Cerro Bravo
+    - Santander
+    - Cavernas del Nus
+    - Eje Cafetero
+    - Mompox
+    - Jericó
+    - Pueblorrico
+    - Norcasia
+    - Trigané
+    - La Guajira
+
+  # === Playas (no interesan) ===
+  playa:
+    - Bahía Málaga
+    - Rincón del Mar
+    - Isla Múcura
+    - Isla Fuerte
+    - playa  # keyword genérico
+
+  # === No interesa ===
+  no_interesa:
+    - avistamiento de ballenas
+    - Ballenas
+    - avistamiento

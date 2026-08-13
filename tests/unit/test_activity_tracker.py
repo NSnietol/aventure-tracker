@@ -42,29 +42,17 @@ accounts:
 
 
 @pytest.fixture
-def wishlist_config(tmp_path: Path) -> Path:
-    """Create a temporary wishlist config file."""
-    config_path = tmp_path / "wishlist.yaml"
+def destinations_config(tmp_path: Path) -> Path:
+    """Create a temporary destinations config file (blacklist)."""
+    config_path = tmp_path / "destinations.yaml"
     config_path.write_text(
         """
-destinations:
-  - Guatapé
-  - Santa Marta
-  - Cartagena
-"""
-    )
-    return config_path
-
-
-@pytest.fixture
-def done_config(tmp_path: Path) -> Path:
-    """Create a temporary done config file."""
-    config_path = tmp_path / "done.yaml"
-    config_path.write_text(
-        """
-done:
-  - destination: Guatapé
-    date: "2024-06-15"
+blacklist:
+  ya_fue:
+    - San Luis
+    - Tatacoa
+  playa:
+    - Rincón del Mar
 """
     )
     return config_path
@@ -108,12 +96,23 @@ def extracted_activity() -> ExtractedActivity:
 
 @pytest.fixture
 def match_result() -> MatchResult:
-    """Create a test match result for wishlist match."""
+    """Create a test match result (not blacklisted - should notify)."""
     return MatchResult(
-        is_wishlist_match=True,
-        matched_destination="Guatapé",
-        is_already_done=False,
+        is_blacklisted=False,
+        matched_blacklist=None,
+        blacklist_reason=None,
         match_score=0.9,
+    )
+
+
+@pytest.fixture
+def match_result_blacklisted() -> MatchResult:
+    """Create a test match result for blacklisted activity."""
+    return MatchResult(
+        is_blacklisted=True,
+        matched_blacklist="San Luis",
+        blacklist_reason="ya_fue",
+        match_score=0.0,
     )
 
 
@@ -167,8 +166,7 @@ def mock_history_manager_base() -> MagicMock:
 @pytest.fixture
 def service(
     accounts_config: Path,
-    wishlist_config: Path,
-    done_config: Path,
+    destinations_config: Path,
     mock_state_manager: MagicMock,
     mock_notifier: AsyncMock,
     mock_scraper: AsyncMock,
@@ -178,8 +176,7 @@ def service(
     """Create an activity tracker service with mocked dependencies."""
     return ActivityTrackerService(
         accounts_config_path=accounts_config,
-        wishlist_config_path=wishlist_config,
-        done_config_path=done_config,
+        destinations_config_path=destinations_config,
         state_manager=mock_state_manager,
         notifier=mock_notifier,
         scraper=mock_scraper,
@@ -230,7 +227,8 @@ class TestActivityAlert:
 
         assert alert.post.id == "12345"
         assert alert.account.username == "adventure_co"
-        assert alert.destination == "Guatapé"
+        # destination is None since it's not blacklisted
+        assert alert.destination is None
 
     def test_activity_alert_properties(
         self,
@@ -249,7 +247,8 @@ class TestActivityAlert:
 
         assert alert.activity_name == "Piedra del Peñol Tour"
         assert alert.price == 85000
-        assert alert.destination == "Guatapé"
+        # destination shows blacklisted match (None if not blacklisted)
+        assert alert.destination is None
 
     def test_activity_alert_without_extracted(
         self,
@@ -278,22 +277,21 @@ class TestCheckAccount:
         service: ActivityTrackerService,
         account: InstagramAccountConfig,
     ) -> None:
-        """Test check_account returns alerts for wishlist matches."""
-        # Mock inventory to return wishlist match
+        """Test check_account returns alerts for non-blacklisted activities."""
+        # Mock inventory to return non-blacklisted (should_notify=True)
         with patch.object(
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=True,
-                matched_destination="Guatapé",
-                is_already_done=False,
+                is_blacklisted=False,
+                matched_blacklist=None,
+                blacklist_reason=None,
                 match_score=0.9,
             ),
         ):
             alerts = await service.check_account(account)
 
         assert len(alerts) == 1
-        assert alerts[0].destination == "Guatapé"
 
     @pytest.mark.asyncio
     async def test_check_account_skips_seen_posts(
@@ -310,19 +308,19 @@ class TestCheckAccount:
         assert len(alerts) == 0
 
     @pytest.mark.asyncio
-    async def test_check_account_skips_non_wishlist(
+    async def test_check_account_skips_blacklisted(
         self,
         service: ActivityTrackerService,
         account: InstagramAccountConfig,
     ) -> None:
-        """Test check_account skips posts not matching wishlist."""
+        """Test check_account skips blacklisted activities."""
         with patch.object(
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=False,
-                matched_destination=None,
-                is_already_done=False,
+                is_blacklisted=True,
+                matched_blacklist="San Luis",
+                blacklist_reason="ya_fue",
                 match_score=0.0,
             ),
         ):
@@ -331,25 +329,26 @@ class TestCheckAccount:
         assert len(alerts) == 0
 
     @pytest.mark.asyncio
-    async def test_check_account_skips_already_done(
+    async def test_check_account_alerts_for_non_blacklisted(
         self,
         service: ActivityTrackerService,
         account: InstagramAccountConfig,
     ) -> None:
-        """Test check_account skips activities already done."""
+        """Test check_account generates alerts for non-blacklisted activities."""
         with patch.object(
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=True,
-                matched_destination="Guatapé",
-                is_already_done=True,
+                is_blacklisted=False,
+                matched_blacklist=None,
+                blacklist_reason=None,
                 match_score=0.9,
             ),
         ):
             alerts = await service.check_account(account)
 
-        assert len(alerts) == 0
+        assert len(alerts) == 1
+        assert alerts[0].match.should_notify is True
 
 
 class TestTrackActivities:
@@ -364,9 +363,9 @@ class TestTrackActivities:
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=False,
-                matched_destination=None,
-                is_already_done=False,
+                is_blacklisted=True,  # Blacklisted - no alerts
+                matched_blacklist="San Luis",
+                blacklist_reason="ya_fue",
                 match_score=0.0,
             ),
         ):
@@ -381,14 +380,14 @@ class TestTrackActivities:
         self,
         service: ActivityTrackerService,
     ) -> None:
-        """Test track_activities generates alerts for wishlist matches."""
+        """Test track_activities generates alerts for non-blacklisted activities."""
         with patch.object(
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=True,
-                matched_destination="Guatapé",
-                is_already_done=False,
+                is_blacklisted=False,  # Not blacklisted - should alert
+                matched_blacklist=None,
+                blacklist_reason=None,
                 match_score=0.9,
             ),
         ):
@@ -407,9 +406,9 @@ class TestTrackActivities:
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=True,
-                matched_destination="Guatapé",
-                is_already_done=False,
+                is_blacklisted=False,
+                matched_blacklist=None,
+                blacklist_reason=None,
                 match_score=0.9,
             ),
         ):
@@ -443,9 +442,9 @@ class TestTrackActivities:
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=False,
-                matched_destination=None,
-                is_already_done=False,
+                is_blacklisted=True,
+                matched_blacklist="San Luis",
+                blacklist_reason="ya_fue",
                 match_score=0.0,
             ),
         ):
@@ -630,12 +629,16 @@ class TestHelperMethods:
         assert len(accounts) == 2
         assert all(a.enabled for a in accounts)
 
-    def test_get_wishlist_destinations(self, service: ActivityTrackerService) -> None:
-        """Test get_wishlist_destinations returns destinations."""
-        destinations = service.get_wishlist_destinations()
+    def test_get_blacklisted_destinations(
+        self, service: ActivityTrackerService
+    ) -> None:
+        """Test get_blacklisted_destinations returns destinations."""
+        destinations = service.get_blacklisted_destinations()
 
-        assert "Guatapé" in destinations
-        assert "Santa Marta" in destinations
+        # Destinations are normalized to lowercase
+        assert "san luis" in destinations
+        assert "tatacoa" in destinations
+        assert "rincón del mar" in destinations
 
 
 class TestSaveState:
@@ -743,8 +746,7 @@ class TestHistoryIntegration:
     def service_with_history(
         self,
         accounts_config: Path,
-        wishlist_config: Path,
-        done_config: Path,
+        destinations_config: Path,
         mock_state_manager: MagicMock,
         mock_notifier: AsyncMock,
         mock_scraper: AsyncMock,
@@ -754,8 +756,7 @@ class TestHistoryIntegration:
         """Create an activity tracker service with history manager."""
         return ActivityTrackerService(
             accounts_config_path=accounts_config,
-            wishlist_config_path=wishlist_config,
-            done_config_path=done_config,
+            destinations_config_path=destinations_config,
             state_manager=mock_state_manager,
             notifier=mock_notifier,
             scraper=mock_scraper,
@@ -778,9 +779,9 @@ class TestHistoryIntegration:
             service_with_history._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=False,
-                matched_destination=None,
-                is_already_done=False,
+                is_blacklisted=True,
+                matched_blacklist="San Luis",
+                blacklist_reason="ya_fue",
                 match_score=0.0,
             ),
         ):
@@ -801,9 +802,9 @@ class TestHistoryIntegration:
             service_with_history._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=True,
-                matched_destination="Guatapé",
-                is_already_done=False,
+                is_blacklisted=False,
+                matched_blacklist=None,
+                blacklist_reason=None,
                 match_score=0.9,
             ),
         ):
@@ -824,9 +825,9 @@ class TestHistoryIntegration:
             service_with_history._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=False,
-                matched_destination=None,
-                is_already_done=False,
+                is_blacklisted=True,
+                matched_blacklist="San Luis",
+                blacklist_reason="ya_fue",
                 match_score=0.0,
             ),
         ):
@@ -861,9 +862,9 @@ class TestHistoryIntegration:
             service_with_history._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=False,
-                matched_destination=None,
-                is_already_done=False,
+                is_blacklisted=True,
+                matched_blacklist="San Luis",
+                blacklist_reason="ya_fue",
                 match_score=0.0,
             ),
         ):
@@ -944,7 +945,7 @@ class TestEventInfoExtraction:
     async def test_alert_contains_event_info(
         self,
         accounts_config: Path,
-        wishlist_config: Path,
+        destinations_config: Path,
         mock_scraper: AsyncMock,
         post_with_date: InstagramPost,
         mock_history_for_event_test: MagicMock,
@@ -954,7 +955,7 @@ class TestEventInfoExtraction:
 
         service = ActivityTrackerService(
             accounts_config_path=accounts_config,
-            wishlist_config_path=wishlist_config,
+            destinations_config_path=destinations_config,
             scraper=mock_scraper,
             history_manager=mock_history_for_event_test,
             use_ocr=False,
@@ -964,9 +965,9 @@ class TestEventInfoExtraction:
             service._inventory,
             "match_post",
             return_value=MatchResult(
-                is_wishlist_match=True,
-                matched_destination="Cocuy",
-                is_already_done=False,
+                is_blacklisted=False,  # Not blacklisted, should alert
+                matched_blacklist=None,
+                blacklist_reason=None,
                 match_score=0.9,
             ),
         ):

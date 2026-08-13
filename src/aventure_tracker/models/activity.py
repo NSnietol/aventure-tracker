@@ -182,32 +182,121 @@ class BlacklistEntry:
         return self.destination.lower().strip()
 
 
-class BlacklistConfig(BaseModel):
-    """Configuration for blacklisted/excluded destinations.
+class DestinationsConfig(BaseModel):
+    """Configuration for destination filtering (blacklist-only approach).
 
-    Destinations can be excluded for various reasons:
-    - ya_fue: Already visited
-    - no_interesa: Not interested
-    - playa: Beach destination (not interested)
-    - otro: Other reason
+    All activities are shown EXCEPT those matching the blacklist.
+    Blacklist is organized by reason (ya_fue, playa, no_interesa, etc.).
     """
 
-    # Simple list of destinations (backward compatible)
-    destinations: list[str] = Field(default_factory=list)
-
-    # Structured list with reasons
-    entries: list[dict[str, str]] = Field(default_factory=list)
+    blacklist: dict[str, list[str]] = Field(default_factory=dict)
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "BlacklistConfig":
-        """Load blacklist from a YAML file.
+    def from_yaml(cls, path: Path) -> "DestinationsConfig":
+        """Load destinations config from a YAML file.
 
         Args:
             path: Path to the YAML configuration file.
 
         Returns:
-            BlacklistConfig instance.
+            DestinationsConfig instance.
         """
+        if not path.exists():
+            return cls(blacklist={})
+
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        if data is None:
+            return cls(blacklist={})
+
+        if data.get("blacklist") is None:
+            data["blacklist"] = {}
+
+        return cls.model_validate(data)
+
+    def get_all_blacklisted(self) -> set[str]:
+        """Get all blacklisted destinations as lowercase set.
+
+        Returns:
+            Set of lowercase destination names from all reasons.
+        """
+        result: set[str] = set()
+        for destinations in self.blacklist.values():
+            for dest in destinations:
+                result.add(dest.lower().strip())
+        return result
+
+    def get_by_reason(self, reason: str) -> list[str]:
+        """Get blacklisted destinations by reason.
+
+        Args:
+            reason: Reason key (ya_fue, playa, no_interesa, etc.).
+
+        Returns:
+            List of destinations for that reason.
+        """
+        return self.blacklist.get(reason, [])
+
+    def is_blacklisted(self, text: str) -> tuple[bool, str | None, str | None]:
+        """Check if text matches any blacklisted destination.
+
+        Args:
+            text: Text to check against blacklist.
+
+        Returns:
+            Tuple of (is_blacklisted, matched_destination, reason).
+        """
+        text_lower = text.lower()
+        for reason, destinations in self.blacklist.items():
+            for dest in destinations:
+                if dest.lower().strip() in text_lower:
+                    return True, dest, reason
+        return False, None, None
+
+    def add_to_blacklist(self, destination: str, reason: str = "ya_fue") -> None:
+        """Add a destination to the blacklist.
+
+        Args:
+            destination: Destination name.
+            reason: Reason for blacklisting.
+        """
+        if reason not in self.blacklist:
+            self.blacklist[reason] = []
+        if destination not in self.blacklist[reason]:
+            self.blacklist[reason].append(destination)
+
+    def save(self, path: Path) -> None:
+        """Save config to YAML file.
+
+        Args:
+            path: Path to save the file.
+        """
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("# Destinations Config - Blacklist Only\n")
+            f.write("# Recibes notificaciones de TODOS los planes EXCEPTO los que están aquí.\n\n")
+            yaml.dump(
+                {"blacklist": self.blacklist},
+                f,
+                allow_unicode=True,
+                default_flow_style=False,
+                sort_keys=False,
+            )
+
+
+# Keep BlacklistConfig for backward compatibility
+class BlacklistConfig(BaseModel):
+    """Configuration for blacklisted/excluded destinations.
+
+    DEPRECATED: Use DestinationsConfig instead.
+    """
+
+    destinations: list[str] = Field(default_factory=list)
+    entries: list[dict[str, str]] = Field(default_factory=list)
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "BlacklistConfig":
+        """Load blacklist from a YAML file."""
         if not path.exists():
             return cls(destinations=[], entries=[])
 
@@ -217,7 +306,6 @@ class BlacklistConfig(BaseModel):
         if data is None:
             return cls(destinations=[], entries=[])
 
-        # Handle simple list format
         if data.get("destinations") is None:
             data["destinations"] = []
         if data.get("entries") is None:
@@ -226,41 +314,15 @@ class BlacklistConfig(BaseModel):
         return cls.model_validate(data)
 
     def get_all_destinations(self) -> set[str]:
-        """Get all blacklisted destinations as lowercase set.
-
-        Returns:
-            Set of lowercase destination names from both formats.
-        """
+        """Get all blacklisted destinations as lowercase set."""
         result = {d.lower().strip() for d in self.destinations}
         for entry in self.entries:
             if "destination" in entry:
                 result.add(entry["destination"].lower().strip())
         return result
 
-    def get_entries_by_reason(self, reason: str) -> list[BlacklistEntry]:
-        """Get blacklist entries filtered by reason.
-
-        Args:
-            reason: Reason to filter by (ya_fue, no_interesa, playa, etc.).
-
-        Returns:
-            List of matching BlacklistEntry objects.
-        """
-        return [
-            BlacklistEntry(destination=e["destination"], reason=e["reason"])
-            for e in self.entries
-            if e.get("reason") == reason
-        ]
-
     def is_blacklisted(self, text: str) -> tuple[bool, str | None]:
-        """Check if text matches any blacklisted destination.
-
-        Args:
-            text: Text to check against blacklist.
-
-        Returns:
-            Tuple of (is_blacklisted, matched_destination).
-        """
+        """Check if text matches any blacklisted destination."""
         text_lower = text.lower()
         for dest in self.get_all_destinations():
             if dest in text_lower:
