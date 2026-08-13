@@ -84,9 +84,21 @@ class RouteHistory:
             return None
         return self.latest_price - self.previous_price
 
-    def add_price(self, price: int) -> None:
-        """Add a new price record."""
+    def add_price(self, price: int) -> bool:
+        """Add a new price record only if price changed.
+
+        Args:
+            price: New price to record.
+
+        Returns:
+            True if price was added (new or changed), False if skipped (same as latest).
+        """
+        # Skip if price is the same as the latest
+        if self.latest_price == price:
+            return False
+
         self.records.append(PriceRecord(price=price, checked_at=datetime.now()))
+        return True
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for YAML."""

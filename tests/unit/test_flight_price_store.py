@@ -118,10 +118,34 @@ class TestRouteHistory:
             records=[],
         )
 
-        history.add_price(150000)
+        result = history.add_price(150000)
 
+        assert result is True
         assert len(history.records) == 1
         assert history.latest_price == 150000
+
+    def test_add_price_skips_duplicate(self) -> None:
+        """Should skip adding if price is same as latest."""
+        history = RouteHistory(
+            route="BAQ-MDE",
+            travel_date=date(2026, 8, 15),
+            records=[],
+        )
+
+        # First price - should add
+        result1 = history.add_price(150000)
+        assert result1 is True
+        assert len(history.records) == 1
+
+        # Same price - should skip
+        result2 = history.add_price(150000)
+        assert result2 is False
+        assert len(history.records) == 1
+
+        # Different price - should add
+        result3 = history.add_price(140000)
+        assert result3 is True
+        assert len(history.records) == 2
 
 
 class TestFlightPriceStore:
