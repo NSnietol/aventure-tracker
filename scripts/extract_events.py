@@ -2,6 +2,7 @@
 """Script to extract events from calendar images.
 
 Uses Gemini (cloud) by default, or Ollama (local) as fallback.
+Skips images that have already been processed (content-based deduplication).
 """
 
 import os
@@ -22,7 +23,7 @@ def process_single_image(args: tuple) -> dict:
     """Process a single image (for thread pool).
     
     Args:
-        args: Tuple of (image_path, agency, month, provider)
+        args: Tuple of (image_path, agency, month, provider, cache_path, force)
     
     Returns:
         Dict with results.
@@ -32,17 +33,36 @@ def process_single_image(args: tuple) -> dict:
         ExtractionConfig,
         ModelProvider,
     )
+    from aventure_tracker.services.extraction_cache import ExtractionCache
     
-    image_path, agency, month, provider = args
+    image_path, agency, month, provider, cache_path, force = args
     
+    # Check cache first (unless force is True)
+    cache = ExtractionCache(cache_path)
+    if not force:
+        cached = cache.get_cached(image_path)
+        if cached:
+            return {
+                "path": image_path,
+                "cached": True,
+                "events_count": cached.events_count,
+                "is_cover": cached.is_cover,
+            }
+    
+    # Not cached or force=True, process the image
     config = ExtractionConfig(provider=provider)
     extractor = ImageEventExtractor(config=config)
     
     result = extractor.extract_from_image(image_path, agency, month)
     
+    # Cache the result if successful
+    if result.success:
+        cache.add(result)
+    
     return {
         "path": image_path,
         "result": result,
+        "cached": False,
     }
 
 
@@ -52,6 +72,8 @@ def run_extraction_parallel(
     month: str,
     workers: int = 3,
     provider: str = "gemini",
+    force: bool = False,
+    cache_path: Path | None = None,
 ) -> None:
     """Run parallel extraction using thread pool.
     
@@ -61,11 +83,19 @@ def run_extraction_parallel(
         month: Month name.
         workers: Number of parallel workers.
         provider: Model provider (gemini or ollama).
+        force: If True, ignore cache and reprocess all images.
+        cache_path: Path to cache file.
     """
     from aventure_tracker.services.file_organizer import detect_file_type
     from aventure_tracker.services.image_event_extractor import ModelProvider
+    from aventure_tracker.services.extraction_cache import ExtractionCache
     
     model_provider = ModelProvider.GEMINI if provider == "gemini" else ModelProvider.OLLAMA
+    
+    if cache_path is None:
+        cache_path = Path("data/extraction_cache.yaml")
+    
+    cache = ExtractionCache(cache_path)
     
     print(f"\nProcesando imágenes de: {source_dir}")
     print(f"Agencia: {agency}, Mes: {month}")
@@ -74,27 +104,42 @@ def run_extraction_parallel(
 
     # Collect valid image files
     image_files = []
+    skipped_cached = 0
+    
     for file_path in sorted(source_dir.iterdir()):
         if file_path.name.startswith("."):
             continue
         # Use magic bytes to detect real images
         detected_type = detect_file_type(file_path)
         if detected_type:
-            image_files.append(file_path)
+            if not force and cache.is_processed(file_path):
+                skipped_cached += 1
+            else:
+                image_files.append(file_path)
         else:
             print(f"   ⚠️  Ignorando {file_path.name} (tipo no reconocido)")
 
+    if skipped_cached > 0:
+        print(f"⏭️  {skipped_cached} imágenes ya procesadas (en cache)")
+
     if not image_files:
-        print("❌ No se encontraron imágenes válidas")
+        if skipped_cached > 0:
+            print("✅ Todas las imágenes ya fueron procesadas")
+        else:
+            print("❌ No se encontraron imágenes válidas")
         return
 
-    print(f"\n📷 {len(image_files)} imágenes a procesar\n")
+    print(f"\n📷 {len(image_files)} imágenes nuevas a procesar\n")
 
     total_events = 0
     total_time = 0
+    cached_count = 0
 
     # Prepare args for thread pool
-    task_args = [(img_path, agency, month, model_provider) for img_path in image_files]
+    task_args = [
+        (img_path, agency, month, model_provider, cache_path, force)
+        for img_path in image_files
+    ]
 
     start_time = time.time()
 
@@ -109,8 +154,19 @@ def run_extraction_parallel(
             img_path = future_to_path[future]
             try:
                 data = future.result()
+                
+                if data.get("cached"):
+                    # This shouldn't happen often since we pre-filter
+                    cached_count += 1
+                    events_count = data["events_count"]
+                    if events_count > 0:
+                        print(f"⏭️  {img_path.name}: {events_count} eventos (cache)")
+                        total_events += events_count
+                    else:
+                        print(f"⏭️  {img_path.name}: Portada (cache)")
+                    continue
+                
                 result = data["result"]
-
                 total_time += result.processing_time_ms
 
                 if result.success:
@@ -132,10 +188,15 @@ def run_extraction_parallel(
 
     print("\n" + "=" * 50)
     print(f"TOTAL: {total_events} eventos extraídos")
-    print(f"Tiempo de procesamiento: {total_time/1000:.1f}s (sum)")
-    print(f"Tiempo real (paralelo):  {wall_time:.1f}s")
-    if wall_time > 0:
-        print(f"Speedup: {total_time/1000/wall_time:.1f}x")
+    if total_time > 0:
+        print(f"Tiempo de procesamiento: {total_time/1000:.1f}s (sum)")
+        print(f"Tiempo real (paralelo):  {wall_time:.1f}s")
+        if wall_time > 0:
+            print(f"Speedup: {total_time/1000/wall_time:.1f}x")
+    
+    # Show cache stats
+    stats = cache.get_stats()
+    print(f"\n📊 Cache: {stats['total_images']} imágenes, {stats['total_events']} eventos totales")
 
 
 def main() -> int:
@@ -174,7 +235,49 @@ def main() -> int:
         default="gemini",
         help="Modelo a usar: gemini (cloud, rápido) u ollama (local, lento)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Ignorar cache y reprocesar todas las imágenes",
+    )
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="Limpiar cache antes de procesar",
+    )
+    parser.add_argument(
+        "--cache-stats",
+        action="store_true",
+        help="Mostrar estadísticas del cache y salir",
+    )
     args = parser.parse_args()
+
+    from aventure_tracker.services.extraction_cache import ExtractionCache
+    
+    cache_path = Path("data/extraction_cache.yaml")
+    cache = ExtractionCache(cache_path)
+
+    # Handle cache-only commands
+    if args.cache_stats:
+        stats = cache.get_stats()
+        print("📊 Estadísticas del cache:")
+        print(f"   Total imágenes: {stats['total_images']}")
+        print(f"   Total eventos:  {stats['total_events']}")
+        print(f"   Portadas:       {stats['covers']}")
+        print(f"\n   Por agencia:")
+        for agency, count in stats['by_agency'].items():
+            print(f"      {agency}: {count} imágenes")
+        return 0
+
+    if args.clear_cache:
+        if args.agency:
+            count = cache.clear_agency(args.agency)
+            print(f"🗑️  Cache limpiado: {count} entradas de {args.agency}")
+        else:
+            count = cache.clear()
+            print(f"🗑️  Cache limpiado: {count} entradas totales")
+        if not args.source.exists():
+            return 0
 
     print("🔍 Verificando configuración...\n")
 
@@ -246,6 +349,8 @@ def main() -> int:
             month=args.month,
             workers=args.workers,
             provider=args.provider,
+            force=args.force,
+            cache_path=cache_path,
         )
 
     return 0
