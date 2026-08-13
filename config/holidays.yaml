@@ -4,44 +4,9 @@
 # Includes 'observed' holidays per Ley Emiliani (movable to Monday)
 #
 # Last updated: 2026-08-13
-# Years: 2025, 2026, 2027
+# Years: 2026, 2027
 
 holidays:
-  2025:
-  - date: '2025-01-01'
-    name: Año Nuevo
-  - date: '2025-01-06'
-    name: Día de los Reyes Magos
-  - date: '2025-03-24'
-    name: Día de San José (observado)
-  - date: '2025-04-17'
-    name: Jueves Santo
-  - date: '2025-04-18'
-    name: Viernes Santo
-  - date: '2025-05-01'
-    name: Día del Trabajo
-  - date: '2025-06-02'
-    name: Ascensión del señor (observado)
-  - date: '2025-06-23'
-    name: Corpus Christi (observado)
-  - date: '2025-06-30'
-    name: Sagrado Corazón (observado); San Pedro y San Pablo (observado)
-  - date: '2025-07-20'
-    name: Día de la Independencia
-  - date: '2025-08-07'
-    name: Batalla de Boyacá
-  - date: '2025-08-18'
-    name: La Asunción (observado)
-  - date: '2025-10-13'
-    name: Día de la Raza (observado)
-  - date: '2025-11-03'
-    name: Día de Todos los Santos (observado)
-  - date: '2025-11-17'
-    name: Independencia de Cartagena (observado)
-  - date: '2025-12-08'
-    name: La Inmaculada Concepción
-  - date: '2025-12-25'
-    name: Navidad
   2026:
   - date: '2026-01-01'
     name: Año Nuevo
