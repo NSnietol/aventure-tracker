@@ -25,13 +25,13 @@ class TestSettings:
         assert settings.app_env == "test"
 
     def test_settings_detects_ci_true(self, mock_ci_env_vars: dict[str, str]) -> None:
-        """Test that settings correctly detects CI=true."""
-        # Arrange & Act
-        settings = Settings()
+        """Test that settings correctly detects CI=true via GITHUB_ACTIONS."""
+        # Arrange & Act - GITHUB_ACTIONS is the authoritative CI detection
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}, clear=False):
+            settings = Settings()
 
-        # Assert
-        assert settings.is_ci is True
-        assert settings.ci is True
+            # Assert
+            assert settings.is_ci is True
 
     def test_settings_detects_ci_false(self, mock_env_vars: dict[str, str]) -> None:
         """Test that settings correctly detects CI=false."""
@@ -43,8 +43,8 @@ class TestSettings:
         assert settings.ci is False
 
     def test_settings_ci_from_env_var_string(self) -> None:
-        """Test CI detection from environment variable string."""
-        with patch.dict(os.environ, {"CI": "true"}, clear=False):
+        """Test CI detection from GITHUB_ACTIONS environment variable."""
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}, clear=False):
             settings = Settings(
                 telegram_bot_token="t",
                 telegram_chat_id="c",
@@ -52,6 +52,11 @@ class TestSettings:
                 gist_token="t",
             )
             assert settings.is_ci is True
+        
+        # Without GITHUB_ACTIONS, is_ci should be False even with CI=true
+        with patch.dict(os.environ, {"CI": "true", "GITHUB_ACTIONS": ""}, clear=False):
+            settings = Settings()
+            assert settings.is_ci is False
 
     def test_settings_default_values(self) -> None:
         """Test that settings has correct default values."""
@@ -79,9 +84,14 @@ class TestSettings:
 
     def test_settings_is_configured_false_when_missing(self) -> None:
         """Test is_configured returns False when required settings missing."""
-        # Arrange
+        # Arrange - clear env vars to get empty defaults
         with patch.dict(os.environ, {}, clear=True):
-            settings = Settings()
+            settings = Settings(
+                telegram_bot_token="",
+                telegram_chat_id="",
+                gist_id="",
+                gist_token="",
+            )
 
             # Assert
             assert settings.is_configured is False

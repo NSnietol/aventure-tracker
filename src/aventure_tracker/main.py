@@ -119,23 +119,35 @@ class AdventureOrchestrator:
         )
 
     async def _init_infrastructure(self) -> None:
-        """Initialize infrastructure components."""
-        # State manager (if configured)
-        if self._settings.gist_id and self._settings.gist_token:
-            self._state_manager = StateManager(
-                gist_id=self._settings.gist_id,
-                token=self._settings.gist_token,
-            )
-            self._state_manager.read()  # Load initial state
-            self._logger.info("State manager initialized")
+        """Initialize infrastructure components.
+        
+        - In CI (GitHub Actions): Use Gist for state persistence
+        - In local: Skip Gist, use local YAML files only
+        """
+        # State manager ONLY in CI environment
+        if self._settings.is_ci and self._settings.gist_id and self._settings.gist_token:
+            try:
+                self._state_manager = StateManager(
+                    gist_id=self._settings.gist_id,
+                    token=self._settings.gist_token,
+                )
+                self._state_manager.read()  # Load initial state
+                self._logger.info("State manager initialized (CI mode)")
+            except Exception as e:
+                self._logger.warning(f"Gist state manager failed: {e}. Continuing without remote state.")
+                self._state_manager = None
+        else:
+            self._logger.info("Local mode - using local YAML storage only")
 
         # Telegram notifier (if configured)
         if self._settings.telegram_bot_token and self._settings.telegram_chat_id:
-            self._notifier = TelegramNotifier(
-                bot_token=self._settings.telegram_bot_token,
-                chat_id=self._settings.telegram_chat_id,
-            )
-            self._logger.info("Telegram notifier initialized")
+            # Skip if placeholder values
+            if "your_" not in self._settings.telegram_bot_token.lower():
+                self._notifier = TelegramNotifier(
+                    bot_token=self._settings.telegram_bot_token,
+                    chat_id=self._settings.telegram_chat_id,
+                )
+                self._logger.info("Telegram notifier initialized")
 
     def _init_trackers(self) -> None:
         """Initialize tracker services."""

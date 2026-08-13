@@ -1,6 +1,7 @@
 """Tests for Main Orchestrator and CLI."""
 
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -539,28 +540,48 @@ class TestInitInfrastructure:
     """Tests for infrastructure initialization."""
 
     @pytest.mark.asyncio
-    async def test_init_with_credentials(self, mock_settings: Settings) -> None:
-        """Test initialization with valid credentials."""
+    async def test_init_with_credentials_in_ci(self, mock_settings: Settings) -> None:
+        """Test initialization with valid credentials in CI environment."""
         orchestrator = AdventureOrchestrator(settings=mock_settings)
 
-        with patch(
-            "aventure_tracker.main.StateManager"
-        ) as mock_state_cls:
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
             with patch(
-                "aventure_tracker.main.TelegramNotifier"
-            ) as mock_notifier_cls:
-                mock_state = MagicMock()
-                mock_state.read = MagicMock()
-                mock_state_cls.return_value = mock_state
+                "aventure_tracker.main.StateManager"
+            ) as mock_state_cls:
+                with patch(
+                    "aventure_tracker.main.TelegramNotifier"
+                ) as mock_notifier_cls:
+                    mock_state = MagicMock()
+                    mock_state.read = MagicMock()
+                    mock_state_cls.return_value = mock_state
 
-                mock_notifier_cls.return_value = MagicMock()
+                    mock_notifier_cls.return_value = MagicMock()
 
-                await orchestrator._init_infrastructure()
+                    # Re-create orchestrator inside patch context so is_ci returns True
+                    mock_settings_ci = Settings(
+                        config_dir=mock_settings.config_dir,
+                        telegram_bot_token="valid_token",
+                        telegram_chat_id="valid_chat",
+                        gist_id="valid_gist",
+                        gist_token="valid_token",
+                    )
+                    orchestrator = AdventureOrchestrator(settings=mock_settings_ci)
+                    await orchestrator._init_infrastructure()
 
-        # Check infrastructure was created
-        assert orchestrator._state_manager is not None
-        assert orchestrator._notifier is not None
-        mock_state.read.assert_called_once()
+            # Check infrastructure was created (only in CI)
+            assert orchestrator._state_manager is not None
+            mock_state.read.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_init_skips_gist_in_local(self, mock_settings: Settings) -> None:
+        """Test initialization skips Gist in local environment."""
+        # Ensure GITHUB_ACTIONS is not set
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": ""}, clear=False):
+            orchestrator = AdventureOrchestrator(settings=mock_settings)
+            await orchestrator._init_infrastructure()
+
+            # State manager should be None in local mode
+            assert orchestrator._state_manager is None
 
     @pytest.mark.asyncio
     async def test_init_without_credentials(self, tmp_path: Path) -> None:

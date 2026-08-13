@@ -91,8 +91,12 @@ class Settings(BaseSettings):
 
     @property
     def is_ci(self) -> bool:
-        """Check if running in CI environment."""
-        return self.ci or os.getenv("CI", "").lower() == "true"
+        """Check if running in CI environment (GitHub Actions).
+        
+        Uses GITHUB_ACTIONS which is ONLY set by GitHub Actions runner,
+        never in local development.
+        """
+        return os.getenv("GITHUB_ACTIONS", "").lower() == "true"
 
     @property
     def is_configured(self) -> bool:
