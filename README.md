@@ -1,50 +1,33 @@
 # Adventure Tracker
 
-Zero-cost orchestrator for tracking cheap flights and Instagram adventure activities, with Telegram notifications and GitHub Gist state persistence.
+Sistema local y offline para rastrear vuelos baratos y extraer eventos de calendarios de agencias de viajes, sin dependencias de APIs externas de pago.
 
 ## Features
 
-- **Flight Tracking**: Monitor Google Flights for cheap weekend trips (BAQ/CTG→MDE)
-- **Activity Tracking**: Scrape Instagram accounts for adventure deals
-- **Smart Notifications**: Telegram alerts for prices below threshold or significant drops
-- **State Persistence**: GitHub Gist storage for tracking price history
-- **Colombian Holidays**: Built-in support for puentes (bridge weekends)
-- **OCR Processing**: Extract activity details from Instagram images
-- **Zero Cost**: Runs on GitHub Actions free tier
+- **Flight Tracking**: Monitoreo de precios en Google Flights para viajes de fin de semana
+  - Rutas: BAQ↔MDE, CTG↔MDE (ida y vuelta)
+  - Busca jueves/viernes (ida) y domingo/lunes (vuelta)
+  - 10 semanas de anticipación (hasta ~2.5 meses)
+  - Alertas cuando precio ≤ umbral ($150,000 COP por trayecto)
 
-## Architecture
+- **Calendar Event Extraction**: Extracción de eventos de imágenes de calendarios
+  - Procesamiento con Ollama + minicpm-v (100% local, offline)
+  - Soporte para múltiples agencias de viajes
+  - Detección de fechas, precios y destinos
 
-```
-aventure-tracker/
-├── src/aventure_tracker/
-│   ├── config.py           # Settings with env vars
-│   ├── main.py             # CLI and orchestrator
-│   ├── models/             # Pydantic data models
-│   ├── services/           # Business logic
-│   │   ├── flight_tracker.py
-│   │   ├── activity_tracker.py
-│   │   ├── flight_dates.py
-│   │   ├── holidays.py
-│   │   ├── inventory.py
-│   │   └── ocr.py
-│   ├── scrapers/           # Web scraping
-│   │   ├── base.py
-│   │   ├── google_flights/
-│   │   └── instagram/
-│   └── infrastructure/     # External services
-│       ├── notifier.py
-│       └── state_manager.py
-├── config/                 # YAML configuration
-├── tests/                  # Unit and integration tests
-└── .github/workflows/      # CI/CD automation
-```
+- **Local Storage**: Todo se guarda localmente
+  - Precios de vuelos: `data/flight_prices.yaml`
+  - Eventos extraídos: `data/events.yaml`
+  - Sin necesidad de GitHub Gist ni APIs externas
+
+- **Colombian Holidays**: Soporte para puentes (fines de semana largos)
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
-- Tesseract OCR with Spanish support
+- [Ollama](https://ollama.ai/) con modelo `minicpm-v`
 - Playwright browsers
 
 ### Installation
@@ -64,148 +47,158 @@ pip install -e ".[dev]"
 # Install Playwright browsers
 playwright install chromium
 
-# Install Tesseract (macOS)
-brew install tesseract tesseract-lang
+# Install Ollama (macOS)
+brew install ollama
 
-# Install Tesseract (Ubuntu)
-sudo apt-get install tesseract-ocr tesseract-ocr-spa
+# Pull the vision model
+ollama pull minicpm-v
 ```
 
-### Configuration
-
-1. Copy the example environment file:
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` with your credentials:
-```env
-# Telegram Bot (from @BotFather)
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
-
-# GitHub Gist (for state persistence)
-GITHUB_GIST_ID=your_gist_id
-GITHUB_GIST_TOKEN=your_pat_with_gist_scope
-```
-
-3. Configure tracking in `config/`:
-   - `routes.yaml` - Flight routes and price thresholds
-   - `accounts.yaml` - Instagram accounts to monitor
-   - `wishlist.yaml` - Desired destinations
-   - `done.yaml` - Completed activities
-   - `holidays.yaml` - Colombian holidays for puentes
-
-### Running Locally
+### Running
 
 ```bash
-# Run all trackers
-aventure-tracker
+# Track flight prices (10 weeks, all routes)
+python src/aventure_tracker/main.py --mode flights --dry-run
 
-# Run only flight tracking
-aventure-tracker --mode flights
+# Extract events from agency calendars
+python scripts/extract_events.py --source agent-calendars/brutal
 
-# Run only activity tracking
-aventure-tracker --mode activities
-
-# Check fewer weeks ahead
-aventure-tracker --weeks 4
-
-# Verbose logging
-aventure-tracker --verbose
-
-# Dry run (no notifications)
-aventure-tracker --dry-run
+# Run with fewer weeks
+python src/aventure_tracker/main.py --mode flights --weeks 4 --dry-run
 ```
 
-## Configuration Files
+## Configuration
 
-### routes.yaml
+### Flight Routes (`config/routes.yaml`)
 
 ```yaml
 routes:
+  # Outbound (Thursday/Friday)
   - origin: BAQ
     destination: MDE
-    price_threshold: 150000  # Alert below this price (COP)
-    drop_percentage: 15      # Alert on 15%+ price drop
+    price_threshold: 150000  # COP per leg
+    drop_percentage: 15
+  
   - origin: CTG
     destination: MDE
     price_threshold: 150000
     drop_percentage: 15
+
+  # Return (Sunday/Monday)
+  - origin: MDE
+    destination: BAQ
+    price_threshold: 150000
+    drop_percentage: 15
+
+  - origin: MDE
+    destination: CTG
+    price_threshold: 150000
+    drop_percentage: 15
 ```
 
-### accounts.yaml
-
-```yaml
-accounts:
-  - username: viajeros_colombia
-    name: Viajeros Colombia
-    enabled: true
-  - username: adventure_tours
-    name: Adventure Tours
-    enabled: true
-```
-
-### wishlist.yaml
-
-```yaml
-destinations:
-  - Guatapé
-  - Santa Marta
-  - San Gil
-  - Salento
-  - Cartagena
-```
-
-### holidays.yaml
+### Holidays (`config/holidays.yaml`)
 
 ```yaml
 holidays:
-  2025:
-    - date: "2025-01-06"
+  2026:
+    - date: "2026-01-06"
       name: "Reyes Magos"
-    - date: "2025-03-24"
+    - date: "2026-03-23"
       name: "San José"
-    # ... more holidays
+    # ... más festivos
 ```
 
-## GitHub Actions
+## Flight Data
 
-### Scheduled Runs
+Los precios se guardan en `data/flight_prices.yaml`:
 
-The tracker runs automatically via GitHub Actions:
+```yaml
+# All prices are ONE-WAY (solo ida)
+# Currency: COP (Colombian Pesos)
 
-| Workflow | Schedule | Description |
-|----------|----------|-------------|
-| `tracker.yaml` | Daily 8 AM COL | Full tracking (flights + activities) |
-| `flights-only.yaml` | 7 AM, 7 PM COL | Flight prices only |
+updated_at: '2026-08-12T10:56:08'
+routes:
+  BAQ-MDE_2026-08-27:
+    route: BAQ-MDE
+    travel_date: '2026-08-27'
+    records:
+    - price: 175691
+      checked_at: '2026-08-12T10:38:41'
+```
 
-### Manual Triggers
+### Search Pattern
 
-You can also trigger runs manually from the Actions tab with custom parameters.
+| Día | Dirección | Propósito |
+|-----|-----------|-----------|
+| Jueves | →MDE | Salida tarde (6pm+) |
+| Viernes | →MDE | Salida temprano |
+| Domingo | MDE→ | Regreso tarde (2pm+) |
+| Lunes | MDE→ | Regreso temprano (antes 10am) |
 
-### Required Secrets
+## Calendar Event Extraction
 
-Add these secrets to your GitHub repository:
+### Setup Agency Images
 
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `GIST_ID`
-- `GIST_TOKEN`
+```
+agent-calendars/
+└── brutal/           # Agencia "Brutal Adventures"
+    ├── agosto.png
+    ├── septiembre.png
+    └── octubre.png
+```
+
+### Run Extraction
+
+```bash
+# Verifica Ollama, inicia servidor si necesario, extrae eventos
+python scripts/extract_events.py --source agent-calendars/brutal
+```
+
+El script:
+1. Verifica que Ollama esté instalado
+2. Verifica que el modelo `minicpm-v` esté disponible
+3. Inicia el servidor Ollama si no está corriendo
+4. Procesa cada imagen y extrae eventos
+5. Guarda resultados en `data/events.yaml`
+
+## Architecture
+
+```
+aventure-tracker/
+├── src/aventure_tracker/
+│   ├── main.py                 # CLI principal
+│   ├── models/
+│   │   ├── flight.py           # RouteConfig, WeekendTrip, FlightResult
+│   │   └── event.py            # ExtractedEvent
+│   ├── services/
+│   │   ├── flight_tracker.py   # Orquestador de vuelos
+│   │   ├── flight_dates.py     # Cálculo de fechas
+│   │   ├── flight_price_store.py # Persistencia YAML
+│   │   ├── holidays.py         # Festivos colombianos
+│   │   └── image_event_extractor.py # Ollama vision
+│   └── scrapers/
+│       └── google_flights/     # Scraper de Google Flights
+├── scripts/
+│   └── extract_events.py       # Script de extracción
+├── config/
+│   ├── routes.yaml             # Rutas de vuelos
+│   └── holidays.yaml           # Festivos
+├── data/
+│   ├── flight_prices.yaml      # Historial de precios (tracked)
+│   └── agencies/               # Eventos extraídos (tracked)
+└── agent-calendars/            # Imágenes de calendarios
+```
 
 ## Development
 
 ### Running Tests
 
 ```bash
+# Activate venv
+source .venv/bin/activate
+
 # All tests
-pytest tests/ -v
-
-# Unit tests only
-pytest tests/unit -v
-
-# Integration tests only
-pytest tests/integration -v -m integration
+pytest tests/ -v --tb=short
 
 # With coverage
 pytest tests/ --cov=src --cov-report=html
@@ -217,72 +210,46 @@ pytest tests/ --cov=src --cov-report=html
 # Linting
 ruff check src/ tests/
 
-# Formatting
+# Formatting  
 ruff format src/ tests/
-
-# Pre-commit hooks
-pre-commit install
-pre-commit run --all-files
 ```
-
-### Project Structure
-
-| Directory | Purpose |
-|-----------|---------|
-| `src/aventure_tracker/models/` | Pydantic models for flights, activities, state |
-| `src/aventure_tracker/services/` | Business logic and orchestration |
-| `src/aventure_tracker/scrapers/` | Playwright-based web scrapers |
-| `src/aventure_tracker/infrastructure/` | External service integrations |
-| `tests/unit/` | Unit tests with mocks |
-| `tests/integration/` | Integration tests |
 
 ## How It Works
 
-### Flight Tracking
+### Flight Tracking Flow
 
-1. **FlightDateCalculator** generates upcoming weekend dates
-2. **HolidayService** identifies puentes (bridge weekends)
-3. **GoogleFlightsScraper** fetches prices from Google Flights
-4. **FlightTrackerService** compares prices against thresholds
-5. **TelegramNotifier** sends alerts for good deals
-6. **StateManager** persists price history to GitHub Gist
+1. `FlightDateCalculator` genera los próximos 10 weekends
+2. `HolidayService` identifica puentes
+3. Para cada ruta (4 rutas: ida/vuelta × BAQ/CTG):
+   - Rutas →MDE: busca jueves + viernes
+   - Rutas MDE→: busca domingo + lunes
+4. `GoogleFlightsScraper` obtiene precios de Google Flights
+5. `FlightPriceStore` guarda historial en YAML local
+6. Genera alertas si precio ≤ umbral
 
-### Activity Tracking
+### Event Extraction Flow
 
-1. **InstagramScraper** fetches recent posts from monitored accounts
-2. **OCRProcessor** extracts activity details from images
-3. **InventoryManager** matches against wishlist/done lists
-4. **ActivityTrackerService** generates alerts for new activities
-5. **TelegramNotifier** sends activity alerts
+1. `extract_events.py` valida Ollama y modelo
+2. Para cada imagen en el directorio:
+   - Envía imagen a Ollama (minicpm-v)
+   - Modelo extrae eventos (fecha, destino, precio, descripción)
+   - Calcula confidence score
+3. Guarda eventos en `data/events.yaml`
 
-## Travel Pattern
+## Offline Capabilities
 
-The tracker is configured for weekend trips with this pattern:
+El sistema está diseñado para funcionar sin APIs externas de pago:
 
-**Outbound:**
-- Thursday evening (after 6 PM)
-- Friday daytime (before 4 PM)
+| Componente | Solución Offline |
+|------------|------------------|
+| Vision/OCR | Ollama + minicpm-v (local) |
+| Persistencia | YAML files (git tracked) |
+| Web scraping | Playwright (headless) |
 
-**Return:**
-- Sunday afternoon (after 2 PM)
-- Monday morning (before 10 AM)
-
-This maximizes time at the destination while minimizing work impact.
+Solo requiere conexión a internet para:
+- Scraping de Google Flights
+- (Opcional) Telegram notifications
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Run tests: `pytest tests/ -v`
-4. Submit a pull request
-
-## Acknowledgments
-
-- [Playwright](https://playwright.dev/) for browser automation
-- [Instaloader](https://instaloader.github.io/) for Instagram scraping
-- [Tesseract](https://github.com/tesseract-ocr/tesseract) for OCR
-- [Nager.Date](https://date.nager.at/) for holiday API fallback
+MIT License
