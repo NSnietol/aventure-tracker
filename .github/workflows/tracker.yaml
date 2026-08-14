@@ -2,8 +2,8 @@ name: Adventure Tracker
 
 on:
   schedule:
-    # Daily at 8:00 AM Colombia time (UTC-5 = 13:00 UTC)
-    - cron: "0 13 * * *"
+    # Mon, Wed, Fri at 8:00 AM Colombia time (UTC-5 = 13:00 UTC)
+    - cron: "0 13 * * 1,3,5"
   workflow_dispatch:
     inputs:
       weeks:
