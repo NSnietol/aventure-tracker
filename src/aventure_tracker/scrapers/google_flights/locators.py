@@ -147,13 +147,3 @@ class ConsentLocators:
     CLOSE_BUTTON = "button[aria-label='Cerrar']"
 
 
-# =============================================================================
-# Mobile/Responsive Locators (fallbacks)
-# =============================================================================
-
-class MobileLocators:
-    """Locators for mobile view (may appear on narrow viewports)."""
-
-    HAMBURGER_MENU = "button[aria-label='Menú']"
-    BOTTOM_SHEET = "[role='dialog'][aria-modal='true']"
-    BACK_BUTTON = "button[aria-label='Atrás']"

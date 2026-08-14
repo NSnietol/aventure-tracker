@@ -66,12 +66,6 @@ class ElementNotFoundError(ScraperError):
     pass
 
 
-class ScraperTimeoutError(ScraperError):
-    """Timeout during scraping operation."""
-
-    pass
-
-
 class BaseScraper(ABC):
     """Base class for all scrapers with Playwright stealth support.
 
