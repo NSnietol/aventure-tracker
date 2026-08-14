@@ -12,6 +12,7 @@ from aventure_tracker.models.flight import (
     RouteConfig,
     RoutesConfig,
     SearchDay,
+    AirlinePolicy,
 )
 from aventure_tracker.scrapers.google_flights import GoogleFlightsScraper
 from aventure_tracker.services.flight_dates import FlightDateCalculator
@@ -20,22 +21,13 @@ from aventure_tracker.services.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 
-# Airline priority configuration
-PRIORITY_AIRLINE = "LATAM"
-# Price threshold to consider non-priority airlines (in COP)
-NON_PRIORITY_PRICE_THRESHOLD = 120000
-
 # Time filters by day of week (based on requirements)
-# Thursday: after 6PM (18:00)
-# Friday: before 4PM (16:00)
-# Sunday: after 2PM (14:00)
-# Monday: before 10AM (10:00)
 TIME_FILTERS: dict[SearchDay, tuple[time, time]] = {
-    SearchDay.THURSDAY: (time(18, 0), time(23, 59)),  # 6PM - midnight
-    SearchDay.FRIDAY: (time(0, 0), time(16, 0)),  # midnight - 4PM
-    SearchDay.SATURDAY: (time(0, 0), time(23, 59)),  # all day
-    SearchDay.SUNDAY: (time(14, 0), time(23, 59)),  # 2PM - midnight
-    SearchDay.MONDAY: (time(0, 0), time(10, 0)),  # midnight - 10AM
+    SearchDay.THURSDAY: (time(18, 0), time(23, 59)),
+    SearchDay.FRIDAY: (time(0, 0), time(16, 0)),
+    SearchDay.SATURDAY: (time(0, 0), time(23, 59)),
+    SearchDay.SUNDAY: (time(14, 0), time(23, 59)),
+    SearchDay.MONDAY: (time(0, 0), time(10, 0)),
 }
 
 
@@ -165,6 +157,12 @@ class FlightTrackerService:
         if self._routes is None:
             self._routes = RoutesConfig.from_yaml(self._routes_config_path)
             logger.info(f"Loaded {len(self._routes.routes)} routes")
+            policy = self._routes.airline_policy
+            logger.info(
+                f"Airline policy: priority={policy.priority_airlines}, "
+                f"bargain_threshold=${policy.bargain_threshold:,}, "
+                f"extra_rules={len(policy.extra_airlines)}"
+            )
         return self._routes
 
     def _get_date_calculator(self) -> FlightDateCalculator:
@@ -208,31 +206,50 @@ class FlightTrackerService:
         min_time, max_time = time_range
         return min_time <= flight_time <= max_time
 
-    def _should_track_flight(self, flight: FlightResult) -> bool:
-        """Determine if a flight should be tracked based on airline priority.
+    def _should_track_flight(self, flight: FlightResult, route: RouteConfig) -> bool:
+        """Determine if a flight should be tracked using AirlinePolicy.
 
-        Priority rules:
-        - LATAM: Always track
-        - Other airlines: Only if price <= 120,000 COP
+        Delegates to the policy loaded from routes.yaml:
+        1. Priority airlines (e.g. LATAM) → include if price ≤ route threshold
+        2. Any airline if price ≤ bargain_threshold (110K COP default)
+        3. Extra airline rules configured in routes.yaml or added at runtime
 
         Args:
             flight: The flight result.
+            route: The route config (provides price_threshold).
 
         Returns:
             True if flight should be tracked.
         """
-        airline_upper = flight.airline.upper()
-
-        # LATAM always has priority
-        if PRIORITY_AIRLINE in airline_upper:
-            return True
-
-        # Other airlines only if price is very low
-        return flight.price <= NON_PRIORITY_PRICE_THRESHOLD
+        routes = self._load_routes()
+        policy = routes.airline_policy
+        should, reason = policy.should_track(
+            airline=flight.airline,
+            price=flight.price,
+            route_threshold=route.price_threshold,
+        )
+        if not should:
+            logger.debug(f"    Skipping {flight.airline} ${flight.price:,}: {reason}")
+        return should
 
     def _is_priority_airline(self, airline: str) -> bool:
-        """Check if airline is the priority airline."""
-        return PRIORITY_AIRLINE in airline.upper()
+        """Check if airline is a priority airline per policy."""
+        routes = self._load_routes()
+        return routes.airline_policy.is_priority(airline)
+
+    def add_airline(self, name: str, max_price: int | None = None) -> None:
+        """Add an airline rule at runtime without reloading config.
+
+        Useful for adding airlines dynamically (e.g. from CLI flags or tests)
+        without editing routes.yaml.
+
+        Args:
+            name: Airline name fragment (case-insensitive match).
+            max_price: Max price in COP, or None to always include.
+        """
+        routes = self._load_routes()
+        routes.airline_policy.add_airline(name, max_price)
+        logger.info(f"Runtime airline rule added: {name} max_price={max_price}")
 
     async def track_flights(self) -> FlightTrackerResult:
         """Run the flight tracking process.
@@ -289,8 +306,8 @@ class FlightTrackerService:
                                 )
                                 continue
 
-                            # Check airline priority
-                            if not self._should_track_flight(flight):
+                            # Check airline policy
+                            if not self._should_track_flight(flight, route):
                                 logger.debug(
                                     f"    Skipping {flight.airline} ${flight.price:,}: "
                                     f"not priority and price > {NON_PRIORITY_PRICE_THRESHOLD:,}"
