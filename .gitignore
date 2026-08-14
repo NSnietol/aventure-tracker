@@ -179,8 +179,10 @@ inbox/
 # Manual test scripts (not unit tests)  
 scripts/test_*.py
 
-# Research docs (not essential)
-docs/
+# Research docs (not essential, excluded)
+docs/RESEARCH_EVENT_EXTRACTION.md
+# Business rules tracked explicitly
+!docs/business.rules.md
 
 # Ignore activity history (personal tracking state)
 data/activity_history.yaml
