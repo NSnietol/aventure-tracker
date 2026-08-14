@@ -113,13 +113,34 @@ class AdventureOrchestrator:
 
     def _setup_logging(self) -> None:
         """Configure logging based on settings."""
+        import time as _time
+
         log_level = getattr(logging, self._settings.log_level.upper(), logging.INFO)
 
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+        # Use Colombia time (UTC-5) for log timestamps
+        _colombia_offset = -5 * 3600  # seconds
+
+        class ColombiaFormatter(logging.Formatter):
+            def converter(self, timestamp: float):  # type: ignore[override]
+                import datetime
+                return datetime.datetime.fromtimestamp(
+                    timestamp,
+                    tz=datetime.timezone(datetime.timedelta(hours=-5)),
+                ).timetuple()
+
+        formatter = ColombiaFormatter(
+            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S Col",
         )
+
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+
+        root = logging.getLogger()
+        root.setLevel(log_level)
+        # Remove existing handlers to avoid duplicate output
+        root.handlers.clear()
+        root.addHandler(handler)
 
     async def _init_infrastructure(self) -> None:
         """Initialize infrastructure components.
