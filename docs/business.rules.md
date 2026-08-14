@@ -50,25 +50,29 @@ El día y ventana válidos dependen de **cuándo empieza la aventura en MDE**:
 
 El día válido depende de **cuándo termina la aventura en MDE** y del tramo extra BAQ:
 
-| Fin de la aventura en MDE | Vuelo de vuelta válido | Ventana horaria | Motivo                                                          |
-|---------------------------|------------------------|-----------------|----------------------------------------------------------------|
-| Domingo                   | **Lunes**              | 00:00 – 10:00   | El grupo regresa a MDE ~8PM el domingo; no hay vuelo viable ese día |
-| Lunes                     | **Martes**             | Madrugada / temprano | El grupo termina el lunes en MDE; el usuario vuela el martes  |
+| Fin de la aventura en MDE | Vuelo de vuelta válido | Ventana horaria        | Motivo                                                          |
+|---------------------------|------------------------|------------------------|----------------------------------------------------------------|
+| Domingo (aventura solo sábado) | **Domingo** ≥ 11:00 | 11:00 – 23:59       | Solo aplica si no hay eventos el domingo; el grupo regresa a MDE desde la aventura del sábado |
+| Domingo (aventura con eventos domingo) | **Lunes** | 00:00 – 10:00   | Aventura ocupa el domingo; el grupo llega a MDE ~8PM, imposible volar ese día |
+| Lunes                     | **Martes**             | 00:00 – 10:00          | El grupo termina el lunes en MDE; el usuario vuela el martes temprano |
 
-- **Domingo no es una ventana válida de regreso** aunque haya vuelos disponibles. El grupo típicamente llega a MDE alrededor de las 8PM, demasiado tarde para conectar BAQ.
-- Si la aventura termina el **lunes en MDE**, el vuelo BAQ es el **martes temprano** (no el lunes).
-- La ventana **Lunes 00:00–10:00** aplica cuando la aventura terminó el **domingo** (el usuario viaja el lunes de madrugada o temprano).
+- **La regla del domingo** se determina en `_build_weekend_pairs()` revisando si algún evento del `WeekendPair` tiene fechas que solapen con un domingo del rango (`sunday_adventure` flag).
+- Si `sunday_adventure = True` → vuelos del domingo se bloquean completamente.
+- Si `sunday_adventure = False` → vuelos del domingo con salida ≥ 11:00 son válidos.
+- `TIME_FILTERS` en el código **no incluye SUNDAY** — esa decisión es exclusiva de `_build_weekend_pairs()`.
 
 #### Resumen operativo
 
-| Día de vuelo  | Ventana válida     | Cuándo aplica                                                      |
-|---------------|--------------------|--------------------------------------------------------------------|
-| Jueves        | 18:00 – 23:59      | Aventura empieza el jueves tarde o el viernes                      |
-| Viernes       | 00:00 – 16:00      | Aventura empieza el viernes **o el sábado** (obligatorio en ambos) |
-| Lunes         | 00:00 – 10:00      | Aventura termina el domingo en MDE (~8PM, no es posible volar ese día) |
-| Martes        | Madrugada/temprano | Aventura termina el lunes en MDE                                   |
+| Día de vuelo  | Ventana válida     | Cuándo aplica                                                                |
+|---------------|--------------------|---------------------------------------------------------------------------  |
+| Jueves        | 18:00 – 23:59      | Aventura empieza el jueves tarde o el viernes                                |
+| Viernes       | 00:00 – 16:00      | Aventura empieza el viernes **o el sábado** (obligatorio en ambos casos)     |
+| Domingo       | ≥ 11:00            | Solo si aventura es exclusivamente de sábado (`sunday_adventure = False`)    |
+| Lunes         | 00:00 – 10:00      | Aventura termina el domingo en MDE (~8PM, no es posible volar ese día)       |
+| Martes        | 00:00 – 10:00      | Aventura termina el lunes en MDE                                             |
 
 - Los vuelos fuera de la ventana horaria de su día se **descartan silenciosamente**.
+- `TIME_FILTERS` en el código cubre Jueves, Viernes y Lunes. El domingo es gestionado por `_build_weekend_pairs()`.
 - Si no se puede parsear la hora de salida, el vuelo se acepta por defecto.
 
 ### 2.3 Política de aerolíneas

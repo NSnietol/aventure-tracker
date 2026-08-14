@@ -12,7 +12,6 @@ from pathlib import Path
 
 from aventure_tracker.config import Settings
 from aventure_tracker.infrastructure.email_notifier import EmailNotifier
-from aventure_tracker.infrastructure.notifier import TelegramNotifier
 from aventure_tracker.infrastructure.state_manager import StateManager
 from aventure_tracker.services.activity_tracker import (
     ActivityTrackerResult,
@@ -105,7 +104,6 @@ class AdventureOrchestrator:
         self._show_calendar = show_calendar
 
         self._state_manager: StateManager | None = None
-        self._notifier: TelegramNotifier | None = None
         self._email_notifier: EmailNotifier | None = None
         self._flight_tracker: FlightTrackerService | None = None
         self._activity_tracker: ActivityTrackerService | None = None
@@ -144,16 +142,6 @@ class AdventureOrchestrator:
         else:
             self._logger.info("Local mode - using local YAML storage only")
 
-        # Telegram notifier (if configured)
-        if self._settings.telegram_bot_token and self._settings.telegram_chat_id:
-            # Skip if placeholder values
-            if "your_" not in self._settings.telegram_bot_token.lower():
-                self._notifier = TelegramNotifier(
-                    bot_token=self._settings.telegram_bot_token,
-                    chat_id=self._settings.telegram_chat_id,
-                )
-                self._logger.info("Telegram notifier initialized")
-
         # Email notifier via Resend (if configured)
         if self._settings.resend_api_key and self._settings.email_to:
             if "your_" not in self._settings.resend_api_key.lower():
@@ -170,7 +158,7 @@ class AdventureOrchestrator:
                 routes_config_path=self._settings.get_routes_path(),
                 holidays_config_path=self._settings.get_holidays_path(),
                 state_manager=self._state_manager,
-                notifier=self._notifier,
+                notifier=None,
                 weeks_ahead=self._weeks_ahead,
             )
             self._logger.info("Flight tracker initialized")
@@ -190,10 +178,9 @@ class AdventureOrchestrator:
         if self._mode in (RunMode.ALL, RunMode.ACTIVITIES):
             self._activity_tracker = ActivityTrackerService(
                 accounts_config_path=self._settings.get_accounts_path(),
-                wishlist_config_path=self._settings.get_wishlist_path(),
-                done_config_path=self._settings.get_done_path(),
+                destinations_config_path=self._settings.get_destinations_path(),
                 state_manager=self._state_manager,
-                notifier=self._notifier,
+                notifier=None,
                 use_ocr=True,
                 max_posts_per_account=self._max_posts,
             )
@@ -481,8 +468,8 @@ class AdventureOrchestrator:
                 f"{'[sunday adventure→monday]' if p.sunday_adventure else ''}"
             )
 
-        # Console fallback
-        if not self._notifier and not self._email_notifier:
+        # Console fallback when no email notifier
+        if not self._email_notifier:
             self._logger.info("=== WEEKEND REPORT (no notifier) ===")
             for p in pairs:
                 self._logger.info(f"Finde {p.date_label}{'  ⚠ sunday→monday' if p.sunday_adventure else ''}:")
@@ -495,12 +482,6 @@ class AdventureOrchestrator:
             self._logger.info("===================================")
             return
 
-        if self._notifier:
-            self._notifier.send_weekend_report(
-                outbound_flights=outbound_all,
-                return_flights=return_all,
-                weekend_matches=weekend_matches,
-            )
         if self._email_notifier:
             self._email_notifier.send_weekend_report(pairs=pairs)
 
@@ -548,13 +529,21 @@ class AdventureOrchestrator:
     ) -> list:
         """Build WeekendPair list: one pair per cheap outbound flight.
 
-        Rules:
-        1. Sunday adventure → return must be Monday (filter out Sunday returns)
-        2. Saturday adventure → return can be Sunday 11AM+ or Monday
-        3. Priority airline outbound → prefer same for return unless
-           another airline is ≥100K cheaper
-        4. Show top 3 return options sorted by price
-        5. If no return found → still include pair (has_return=False)
+        Return-day selection rules (in priority order):
+        1. If events fall on Sunday (sunday_adventure=True):
+               → return must be Monday. Sunday returns are blocked entirely.
+               → if adventure ends Monday in MDE, return is Tuesday.
+        2. If adventure is saturday-only (no Sunday events):
+               → Sunday return ≥ 11:00 is allowed (group arrives MDE ~8PM
+                 on Saturday, next morning is Sunday).
+               → Monday return is also valid.
+        3. Priority airline (LATAM) outbound → prefer same for return unless
+           another airline is ≥100K cheaper.
+        4. Show top 3 return options sorted by price.
+        5. If no return found → still include pair (has_return=False).
+
+        Window covers outbound_date through outbound_date + 5 days (Tue)
+        to capture both Monday and Tuesday return flights.
 
         Args:
             outbound_all: All cheap outbound flights sorted by date.
@@ -565,7 +554,7 @@ class AdventureOrchestrator:
             List of WeekendPair.
         """
         from aventure_tracker.services.flight_tracker import WeekendPair, ReturnOption
-        from datetime import timedelta
+        from datetime import timedelta, time as dtime
 
         # Build a quick lookup: window_start → WeekendMatch
         match_by_window: dict = {}
@@ -580,41 +569,47 @@ class AdventureOrchestrator:
         pairs = []
 
         for outbound in outbound_all:
-            # Find which window this outbound belongs to
             window_start = outbound.travel_date
-            # Adjust: if it's a Thursday, window_start = thursday
-            # window covers thu→mon (+4 days)
-            window_end = window_start + timedelta(days=4)
+            # Extend to Tuesday (+5) to capture tuesday-morning returns
+            # when the adventure ends on Monday in MDE.
+            window_end = window_start + timedelta(days=5)
 
             # Get events for this window
             match = match_by_window.get(window_start)
             events = match.events if match else []
 
-            # Detect Sunday adventure
+            # Detect whether any event spans a Sunday in the window
             sunday_adv = self._has_sunday_events(events, window_start, window_end)
 
-            # Collect candidate return flights within this window
+            # Collect candidate return flights within the window
             candidates = []
             current = window_start
             while current <= window_end:
                 day_flights = returns_by_date.get(current, [])
                 for f in day_flights:
-                    # Sunday adventure → only Monday returns
-                    if sunday_adv and f.travel_date.weekday() == 6:  # 6=Sunday
-                        self._logger.debug(
-                            f"  Skipping Sunday return {f.travel_date} {f.airline} "
-                            f"${f.price:,} (sunday adventure active)"
-                        )
-                        continue
-                    # Saturday plan only → allow Sunday 11AM+
-                    if not sunday_adv and f.travel_date.weekday() == 6:
-                        try:
-                            h, m = map(int, f.departure_time.split(":"))
-                            from datetime import time as dtime
-                            if dtime(h, m) < dtime(11, 0):
-                                continue  # Too early Sunday
-                        except Exception:
-                            pass
+                    weekday = f.travel_date.weekday()  # 0=Mon … 6=Sun
+
+                    if weekday == 6:  # Sunday
+                        if sunday_adv:
+                            # Events on Sunday → Sunday return is blocked
+                            self._logger.debug(
+                                f"  Skipping Sunday return {f.travel_date} "
+                                f"{f.airline} ${f.price:,} (sunday adventure active)"
+                            )
+                            continue
+                        else:
+                            # Saturday-only adventure → Sunday ≥ 11:00 allowed
+                            try:
+                                h, m = map(int, f.departure_time.split(":"))
+                                if dtime(h, m) < dtime(11, 0):
+                                    self._logger.debug(
+                                        f"  Skipping Sunday return {f.travel_date} "
+                                        f"{f.airline} {f.departure_time} (< 11:00)"
+                                    )
+                                    continue
+                            except Exception:
+                                pass  # Accept if time can't be parsed
+
                     candidates.append(f)
                 current += timedelta(days=1)
 
@@ -629,22 +624,19 @@ class AdventureOrchestrator:
             ordered: list = []
             if outbound.is_priority and priority_returns:
                 best_priority = priority_returns[0]
-                # Check if any non-priority is ≥100K cheaper
                 significant_saving = 100_000
                 better_non_priority = [
                     f for f in non_priority_returns
                     if best_priority.price - f.price >= significant_saving
                 ]
                 if better_non_priority:
-                    # Non-priority wins — put it first
                     ordered = better_non_priority + [best_priority] + [
                         f for f in non_priority_returns if f not in better_non_priority
                     ]
                 else:
-                    # Priority wins
                     ordered = [best_priority] + non_priority_returns
             else:
-                ordered = candidates  # Already sorted by price
+                ordered = candidates
 
             # Deduplicate by flight_id, keep top 3
             seen_ids: set[str] = set()

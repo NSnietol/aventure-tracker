@@ -20,6 +20,7 @@ class SearchDay(str, Enum):
     SATURDAY = "saturday"
     SUNDAY = "sunday"
     MONDAY = "monday"
+    TUESDAY = "tuesday"
 
 
 class AirlineRule(BaseModel):
@@ -313,6 +314,15 @@ class WeekendTrip:
         """Get Monday after this weekend."""
         return self.return_date + timedelta(days=1)
 
+    @property
+    def tuesday(self) -> date:
+        """Get Tuesday after this weekend.
+
+        Used when the adventure ends on Monday in MDE and the user
+        needs to fly back to BAQ the next morning.
+        """
+        return self.return_date + timedelta(days=2)
+
     def get_date_for_day(self, day: "SearchDay") -> date:
         """Get the date for a specific day of this weekend.
 
@@ -328,6 +338,7 @@ class WeekendTrip:
             SearchDay.SATURDAY: self.saturday,
             SearchDay.SUNDAY: self.sunday,
             SearchDay.MONDAY: self.monday,
+            SearchDay.TUESDAY: self.tuesday,
         }
         return day_map[day]
 

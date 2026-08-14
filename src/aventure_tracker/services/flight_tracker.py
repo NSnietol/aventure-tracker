@@ -21,12 +21,17 @@ from aventure_tracker.services.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 
-# Time filters by day of week (based on requirements)
+# Time filters by day of week
+# IMPORTANT: These filters run BEFORE _build_weekend_pairs().
+# - SUNDAY is intentionally absent: whether a Sunday return is valid
+#   depends on the adventure context (saturday-only vs multi-day).
+#   That decision is made in _build_weekend_pairs(), not here.
+# - SATURDAY is absent: not a valid search day per business rules.
+# - TUESDAY uses a wide early-morning window to cover the case where
+#   the adventure ends Monday in MDE and the user flies home Tuesday.
 TIME_FILTERS: dict[SearchDay, tuple[time, time]] = {
     SearchDay.THURSDAY: (time(18, 0), time(23, 59)),
     SearchDay.FRIDAY: (time(0, 0), time(16, 0)),
-    SearchDay.SATURDAY: (time(0, 0), time(23, 59)),
-    SearchDay.SUNDAY: (time(14, 0), time(23, 59)),
     SearchDay.MONDAY: (time(0, 0), time(10, 0)),
 }
 

@@ -10,7 +10,7 @@ on:
       weeks:
         description: "Weeks ahead to check"
         required: false
-        default: "8"
+        default: "10"
         type: string
 
 env:
@@ -61,5 +61,5 @@ jobs:
         run: |
           python -m aventure_tracker.main \
             --mode flights \
-            --weeks ${{ github.event.inputs.weeks || '8' }} \
+            --weeks ${{ github.event.inputs.weeks || '10' }} \
             --verbose

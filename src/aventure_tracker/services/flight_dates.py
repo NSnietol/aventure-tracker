@@ -10,8 +10,21 @@ from aventure_tracker.services.holidays import HolidayService
 logger = logging.getLogger(__name__)
 
 # Default time ranges based on user's travel pattern:
-# - Outbound: Thursday 6PM+ or Friday before 4PM
-# - Return: Sunday 2PM+ or Monday before 10AM
+#
+# OUTBOUND (BAQ → MDE):
+#   - Thursday evening (18:00–23:59): arrive that night before the plan
+#   - Friday morning/afternoon (00:00–16:00): arrive same day as departure
+#
+# RETURN (MDE → BAQ):
+#   - Monday early morning (00:00–10:00): adventure ended Sunday in MDE (~8PM),
+#     user flies home Monday morning
+#   - Tuesday early morning (00:00–10:00): adventure ended Monday in MDE,
+#     user flies home Tuesday morning
+#
+# NOTE: Sunday is NOT a valid return window by default.
+# The only exception is a saturday-only adventure (no Sunday events), where
+# a Sunday flight ≥ 11:00 is accepted. That exception is handled exclusively
+# in _build_weekend_pairs() in main.py, NOT here.
 
 # Thursday evening (18:00-23:59)
 THURSDAY_EVENING = TimeRange(start=time(18, 0), end=time(23, 59))
@@ -19,11 +32,11 @@ THURSDAY_EVENING = TimeRange(start=time(18, 0), end=time(23, 59))
 # Friday morning/afternoon (00:00-16:00)
 FRIDAY_DAYTIME = TimeRange(start=time(0, 0), end=time(16, 0))
 
-# Sunday afternoon/evening (14:00-23:59)
-SUNDAY_AFTERNOON = TimeRange(start=time(14, 0), end=time(23, 59))
-
 # Monday early morning (00:00-10:00)
 MONDAY_MORNING = TimeRange(start=time(0, 0), end=time(10, 0))
+
+# Tuesday early morning (00:00-10:00) — used when adventure ends Monday in MDE
+TUESDAY_MORNING = TimeRange(start=time(0, 0), end=time(10, 0))
 
 
 class FlightDateCalculator:
@@ -148,11 +161,12 @@ class FlightDateCalculator:
     def _get_return_times(self, sunday: date, monday: date) -> list[TimeRange]:
         """Get valid return time ranges.
 
-        The user prefers:
-        - Sunday afternoon (2PM+) - if no late return routes available
-        - Monday early morning (<10AM) - arrive back for work
+        Return flights are Monday early morning (adventure ended Sunday in MDE)
+        or Tuesday early morning (adventure ended Monday in MDE).
 
-        Some routes don't have late Sunday returns, so Monday early is preferred.
+        Sunday is NOT included here — the only case where Sunday is valid
+        (saturday-only adventure, flight ≥ 11:00) is handled in
+        _build_weekend_pairs() in main.py.
 
         Args:
             sunday: Sunday of the weekend.
@@ -161,15 +175,7 @@ class FlightDateCalculator:
         Returns:
             List of valid time ranges for return flights.
         """
-        times: list[TimeRange] = []
-
-        # Sunday afternoon is valid
-        times.append(SUNDAY_AFTERNOON)
-
-        # Monday morning is valid
-        times.append(MONDAY_MORNING)
-
-        return times
+        return [MONDAY_MORNING, TUESDAY_MORNING]
 
     def _get_outbound_date(self, thursday: date, friday: date) -> date:
         """Get the primary outbound date.
@@ -189,16 +195,17 @@ class FlightDateCalculator:
     def _get_return_date(self, sunday: date, monday: date) -> date:
         """Get the primary return date.
 
-        Sunday is the anchor date, but Monday morning is also valid.
+        Monday is the standard return date (adventure ends Sunday in MDE,
+        user flies back Monday morning).
 
         Args:
             sunday: Sunday of the weekend.
             monday: Monday after the weekend.
 
         Returns:
-            Primary return date (Sunday).
+            Primary return date (Monday).
         """
-        return sunday
+        return monday
 
     def get_bridge_weekends(
         self,
@@ -252,6 +259,10 @@ class FlightDateCalculator:
     ) -> bool:
         """Check if a flight is valid for return travel.
 
+        Note: Sunday validity depends on adventure context and is handled
+        by _build_weekend_pairs() in main.py, not here.
+        This method checks Monday and Tuesday only.
+
         Args:
             flight_date: Date of the flight.
             flight_time: Departure time of the flight.
@@ -260,13 +271,12 @@ class FlightDateCalculator:
         Returns:
             True if the flight is valid for return travel.
         """
-        sunday = weekend.return_date
-        monday = weekend.return_date + timedelta(days=1)
+        monday = weekend.return_date
+        tuesday = monday + timedelta(days=1)
 
-        # Check if date is Sunday or Monday of this weekend
-        if flight_date == sunday:
-            return SUNDAY_AFTERNOON.contains(flight_time)
-        elif flight_date == monday:
+        if flight_date == monday:
             return MONDAY_MORNING.contains(flight_time)
+        elif flight_date == tuesday:
+            return TUESDAY_MORNING.contains(flight_time)
 
         return False

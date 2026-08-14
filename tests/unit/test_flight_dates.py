@@ -10,7 +10,7 @@ from aventure_tracker.models.flight import TimeRange, WeekendTrip
 from aventure_tracker.services.flight_dates import (
     FRIDAY_DAYTIME,
     MONDAY_MORNING,
-    SUNDAY_AFTERNOON,
+    TUESDAY_MORNING,
     THURSDAY_EVENING,
     FlightDateCalculator,
 )
@@ -61,9 +61,9 @@ class TestTimeRangeConstants:
         assert FRIDAY_DAYTIME.end == time(16, 0)
 
     def test_sunday_afternoon_range(self) -> None:
-        """Test Sunday afternoon time range."""
-        assert SUNDAY_AFTERNOON.start == time(14, 0)
-        assert SUNDAY_AFTERNOON.end == time(23, 59)
+        """Test Tuesday morning time range (replaces old Sunday afternoon)."""
+        assert TUESDAY_MORNING.start == time(0, 0)
+        assert TUESDAY_MORNING.end == time(10, 0)
 
     def test_monday_morning_range(self) -> None:
         """Test Monday morning time range."""
@@ -122,24 +122,24 @@ class TestGetUpcomingWeekends:
         for weekend in weekends:
             assert weekend.outbound_date.weekday() == 4  # Friday
 
-    def test_return_date_is_sunday(
+    def test_return_date_is_monday(
         self, calculator: FlightDateCalculator
     ) -> None:
-        """Test that return dates are Sundays."""
+        """Test that return dates are Mondays (adventure ends Sunday in MDE)."""
         weekends = calculator.get_upcoming_weekends(weeks_ahead=5)
 
         for weekend in weekends:
-            assert weekend.return_date.weekday() == 6  # Sunday
+            assert weekend.return_date.weekday() == 0  # Monday
 
-    def test_return_is_two_days_after_outbound(
+    def test_return_is_three_days_after_outbound(
         self, calculator: FlightDateCalculator
     ) -> None:
-        """Test that return is 2 days after outbound (Friday -> Sunday)."""
+        """Test that return is 3 days after outbound (Friday -> Monday)."""
         weekends = calculator.get_upcoming_weekends(weeks_ahead=3)
 
         for weekend in weekends:
             diff = weekend.return_date - weekend.outbound_date
-            assert diff == timedelta(days=2)
+            assert diff == timedelta(days=3)
 
     def test_starting_from_friday_includes_that_friday(
         self, calculator: FlightDateCalculator
@@ -260,18 +260,6 @@ class TestTimeRanges:
             for tr in weekend.outbound_times
         )
 
-    def test_return_times_include_sunday_afternoon(
-        self, calculator: FlightDateCalculator
-    ) -> None:
-        """Test that return times include Sunday afternoon."""
-        weekends = calculator.get_upcoming_weekends(weeks_ahead=1)
-        weekend = weekends[0]
-
-        assert any(
-            tr.start == time(14, 0) and tr.end == time(23, 59)
-            for tr in weekend.return_times
-        )
-
     def test_return_times_include_monday_morning(
         self, calculator: FlightDateCalculator
     ) -> None:
@@ -283,6 +271,26 @@ class TestTimeRanges:
             tr.start == time(0, 0) and tr.end == time(10, 0)
             for tr in weekend.return_times
         )
+
+    def test_return_times_include_tuesday_morning(
+        self, calculator: FlightDateCalculator
+    ) -> None:
+        """Test that return times include Tuesday morning (adventure ends Monday in MDE)."""
+        weekends = calculator.get_upcoming_weekends(weeks_ahead=1)
+        weekend = weekends[0]
+
+        # Both Monday and Tuesday morning should be in return_times
+        assert len(weekend.return_times) == 2
+
+    def test_return_times_do_not_include_sunday(
+        self, calculator: FlightDateCalculator
+    ) -> None:
+        """Test that Sunday is NOT in return_times (handled by _build_weekend_pairs)."""
+        weekends = calculator.get_upcoming_weekends(weeks_ahead=1)
+        weekend = weekends[0]
+
+        # No range that ends at 23:59 (that would be Sunday afternoon)
+        assert not any(tr.end == time(23, 59) for tr in weekend.return_times)
 
 
 class TestIsValidOutboundFlight:
@@ -355,10 +363,14 @@ class TestIsValidOutboundFlight:
 class TestIsValidReturnFlight:
     """Tests for is_valid_return_flight method."""
 
-    def test_sunday_afternoon_flight_valid(
+    def test_sunday_flight_invalid(
         self, calculator: FlightDateCalculator
     ) -> None:
-        """Test Sunday 4PM flight is valid."""
+        """Test Sunday flight is invalid in is_valid_return_flight.
+
+        Sunday validity is handled exclusively by _build_weekend_pairs(),
+        not by this method.
+        """
         friday = date(2025, 3, 7)
         sunday = friday + timedelta(days=2)
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
@@ -366,19 +378,6 @@ class TestIsValidReturnFlight:
 
         assert calculator.is_valid_return_flight(
             sunday, time(16, 0), weekend
-        ) is True
-
-    def test_sunday_morning_flight_invalid(
-        self, calculator: FlightDateCalculator
-    ) -> None:
-        """Test Sunday 10AM flight is invalid (too early)."""
-        friday = date(2025, 3, 7)
-        sunday = friday + timedelta(days=2)
-        weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
-        weekend = weekends[0]
-
-        assert calculator.is_valid_return_flight(
-            sunday, time(10, 0), weekend
         ) is False
 
     def test_monday_early_morning_flight_valid(
@@ -407,10 +406,10 @@ class TestIsValidReturnFlight:
             monday, time(14, 0), weekend
         ) is False
 
-    def test_tuesday_flight_invalid(
+    def test_tuesday_early_morning_flight_valid(
         self, calculator: FlightDateCalculator
     ) -> None:
-        """Test Tuesday flight is invalid regardless of time."""
+        """Test Tuesday 6AM flight is valid (adventure ended Monday in MDE)."""
         friday = date(2025, 3, 7)
         tuesday = friday + timedelta(days=4)
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
@@ -418,6 +417,32 @@ class TestIsValidReturnFlight:
 
         assert calculator.is_valid_return_flight(
             tuesday, time(6, 0), weekend
+        ) is True
+
+    def test_tuesday_afternoon_flight_invalid(
+        self, calculator: FlightDateCalculator
+    ) -> None:
+        """Test Tuesday 2PM flight is invalid (too late)."""
+        friday = date(2025, 3, 7)
+        tuesday = friday + timedelta(days=4)
+        weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
+        weekend = weekends[0]
+
+        assert calculator.is_valid_return_flight(
+            tuesday, time(14, 0), weekend
+        ) is False
+
+    def test_wednesday_flight_invalid(
+        self, calculator: FlightDateCalculator
+    ) -> None:
+        """Test Wednesday flight is invalid regardless of time."""
+        friday = date(2025, 3, 7)
+        wednesday = friday + timedelta(days=5)
+        weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
+        weekend = weekends[0]
+
+        assert calculator.is_valid_return_flight(
+            wednesday, time(6, 0), weekend
         ) is False
 
 
@@ -441,3 +466,13 @@ class TestIntegrationWithHolidayService:
         weekends = calc.get_upcoming_weekends(weeks_ahead=1, from_date=date(2025, 3, 7))
 
         assert weekends[0].is_bridge is False
+
+    def test_return_date_is_monday_not_sunday(self, holidays_config: Path) -> None:
+        """Test that return_date is Monday, not Sunday."""
+        calc = FlightDateCalculator(holidays_config_path=holidays_config)
+        weekends = calc.get_upcoming_weekends(weeks_ahead=1, from_date=date(2025, 3, 7))
+        weekend = weekends[0]
+
+        # return_date should be Monday (weekday 0), not Sunday (weekday 6)
+        assert weekend.return_date.weekday() == 0  # Monday
+        assert weekend.return_date == date(2025, 3, 10)  # Friday Mar 7 + 3 days
