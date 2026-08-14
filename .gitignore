@@ -164,6 +164,9 @@ site/
 # Project Specific
 # =============================================================================
 
+# Kiro IDE settings (may contain local tokens/MCP config)
+.kiro/settings/
+
 # Temporary files
 tmp/
 temp/
