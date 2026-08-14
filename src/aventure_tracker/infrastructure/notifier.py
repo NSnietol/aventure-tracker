@@ -272,6 +272,65 @@ class TelegramNotifier:
 
         return self._send_message(message)
 
+    def send_weekend_report(
+        self,
+        outbound_flights: list,
+        return_flights: list,
+        weekend_matches: list,
+    ) -> bool:
+        """Send consolidated weekend report: cheap flights + available events.
+
+        Args:
+            outbound_flights: List of FlightFound for outbound (BAQ→MDE).
+            return_flights: List of FlightFound for return (MDE→BAQ).
+            weekend_matches: List of WeekendMatch with matched events.
+
+        Returns:
+            True if message was sent successfully.
+        """
+        lines: list[str] = ["✈️ *FINDE BARATO DETECTADO*\n"]
+
+        # Outbound flights
+        if outbound_flights:
+            lines.append("*Ida (BAQ→MDE):*")
+            for f in outbound_flights:
+                date_str = f.travel_date.strftime("%a %d %b")
+                priority = "★" if f.is_priority else ""
+                lines.append(
+                    f"  • {date_str} {f.departure_time} {f.airline}{priority} — "
+                    f"${f.price:,} COP"
+                )
+
+        # Return flights
+        if return_flights:
+            lines.append("\n*Vuelta (MDE→BAQ):*")
+            for f in return_flights:
+                date_str = f.travel_date.strftime("%a %d %b")
+                priority = "★" if f.is_priority else ""
+                lines.append(
+                    f"  • {date_str} {f.departure_time} {f.airline}{priority} — "
+                    f"${f.price:,} COP"
+                )
+
+        # Events per weekend
+        has_any_events = any(m.has_events for m in weekend_matches)
+        if has_any_events:
+            lines.append("\n🏔️ *Planes ese finde:*")
+            for match in weekend_matches:
+                if not match.has_events:
+                    continue
+                lines.append(f"\n_{match.date_label}_")
+                for ev in match.events[:8]:  # Max 8 events per window
+                    lines.append(
+                        f"  • {ev.name} ({ev.date_label}) — {ev.price_formatted}"
+                    )
+        else:
+            lines.append("\n_Sin eventos de agencias para esas fechas_")
+
+        message = "\n".join(lines)
+        logger.info("Sending weekend report")
+        return self._send_message(message)
+
     def send_test_message(self) -> bool:
         """Send a test message to verify configuration.
 

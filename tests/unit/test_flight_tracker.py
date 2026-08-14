@@ -423,8 +423,11 @@ class TestTrackFlights:
 
         result = await service.track_flights()
 
-        assert result.notifications_sent > 0
-        mock_notifier.send_flight_alert.assert_called()
+        # Now tracker collects alerts but doesn't send notifications directly
+        # Notifications are sent by the orchestrator after full scan
+        assert result.alerts_generated > 0
+        assert len(result.price_alerts) > 0
+        assert result.notifications_sent == 0  # Orchestrator handles this
 
     @pytest.mark.asyncio
     async def test_track_flights_handles_no_flights(
@@ -559,6 +562,7 @@ class TestFlightTrackerResultDataclass:
             alerts_generated=5,
             notifications_sent=5,
             prices_found=[],
+            price_alerts=[],
             errors=[],
         )
 

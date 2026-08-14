@@ -101,6 +101,7 @@ class FlightTrackerResult:
         alerts_generated: Number of price alerts.
         notifications_sent: Number of notifications sent.
         prices_found: List of flights found during this run.
+        price_alerts: List of PriceAlert for cheap flights (for orchestrator).
         errors: List of error messages.
     """
 
@@ -110,6 +111,7 @@ class FlightTrackerResult:
     alerts_generated: int
     notifications_sent: int
     prices_found: list[FlightFound]
+    price_alerts: list[PriceAlert]
     errors: list[str]
 
 
@@ -254,6 +256,7 @@ class FlightTrackerService:
             alerts_generated=0,
             notifications_sent=0,
             prices_found=[],
+            price_alerts=[],
             errors=[],
         )
 
@@ -327,12 +330,13 @@ class FlightTrackerService:
                                 price=flight.price,
                             )
 
-                            # Create alert and check if should notify
+                            # Create alert — but DON'T send individual notification
+                            # Notification is sent by orchestrator after full scan
                             alert = self._create_alert(flight_found, route)
                             if alert.should_notify:
                                 result.alerts_generated += 1
-                                await self._send_notification(alert)
-                                result.notifications_sent += 1
+                                # Store alert for orchestrator to handle
+                                result.price_alerts.append(alert)
 
                     except Exception as e:
                         error_msg = f"Error checking {route} on {travel_date}: {e}"

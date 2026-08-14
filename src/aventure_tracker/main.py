@@ -15,6 +15,7 @@ from aventure_tracker.services.activity_tracker import (
     ActivityTrackerResult,
     ActivityTrackerService,
 )
+from aventure_tracker.services.event_matcher import EventMatcher
 from aventure_tracker.services.flight_calendar import (
     FlightCalendarDisplay,
 )
@@ -231,6 +232,12 @@ class AdventureOrchestrator:
                         f"Flight tracking complete: {flights_result.alerts_generated} alerts"
                     )
                     errors.extend(flights_result.errors)
+
+                    # If cheap flights found, run event extraction + send consolidated report
+                    if flights_result.price_alerts and self._notifier:
+                        await self._send_consolidated_report(flights_result)
+                        flights_result.notifications_sent = 1
+
                 except Exception as e:
                     error = f"Flight tracker failed: {e}"
                     self._logger.error(error)
@@ -306,6 +313,62 @@ class AdventureOrchestrator:
         )
 
         return result
+
+    async def _send_consolidated_report(
+        self, flights_result: FlightTrackerResult
+    ) -> None:
+        """Build and send a consolidated weekend report.
+
+        Runs event extraction from the cache, matches events to cheap flight
+        dates, and sends a single Telegram message with flights + events.
+
+        Args:
+            flights_result: Result from flight tracker with price_alerts.
+        """
+        from aventure_tracker.services.flight_tracker import FlightFound
+
+        alerts = flights_result.price_alerts
+        self._logger.info(
+            f"Building consolidated report for {len(alerts)} cheap flight(s)"
+        )
+
+        # Collect cheap flights by direction
+        outbound: list[FlightFound] = []
+        return_flights: list[FlightFound] = []
+        cheap_dates = []
+
+        for alert in alerts:
+            f = alert.flight
+            cheap_dates.append(f.travel_date)
+            if "BAQ" in f.route and f.route.endswith("MDE"):
+                outbound.append(f)
+            else:
+                return_flights.append(f)
+
+        # Sort by date
+        outbound.sort(key=lambda x: (x.travel_date, x.departure_time))
+        return_flights.sort(key=lambda x: (x.travel_date, x.departure_time))
+
+        # Match events from extraction cache
+        matcher = EventMatcher(
+            destinations_path=self._settings.get_destinations_path(),
+        )
+        matcher.load()
+        weekend_matches = matcher.find_events_for_dates(cheap_dates)
+
+        total_events = sum(len(m.events) for m in weekend_matches)
+        self._logger.info(
+            f"Found {total_events} matching events across "
+            f"{len(weekend_matches)} weekend windows"
+        )
+
+        # Send single consolidated notification
+        if self._notifier:
+            self._notifier.send_weekend_report(
+                outbound_flights=outbound,
+                return_flights=return_flights,
+                weekend_matches=weekend_matches,
+            )
 
     def _show_flight_calendar(
         self,

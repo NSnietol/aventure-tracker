@@ -55,6 +55,7 @@ def mock_flight_result() -> FlightTrackerResult:
         alerts_generated=3,
         notifications_sent=3,
         prices_found=[],
+        price_alerts=[],
         errors=[],
     )
 
@@ -338,6 +339,7 @@ class TestOrchestratorRun:
                         alerts_generated=0,
                         notifications_sent=0,
                         prices_found=[],
+                        price_alerts=[],
                         errors=[],
                     )
                 )

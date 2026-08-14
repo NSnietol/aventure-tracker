@@ -131,6 +131,7 @@ class TestOrchestratorIntegration:
                         alerts_generated=1,
                         notifications_sent=0,  # No notifier configured
                         prices_found=[],
+                        price_alerts=[],
                         errors=[],
                     )
                 )
@@ -185,6 +186,7 @@ class TestOrchestratorIntegration:
                     alerts_generated=2,
                     notifications_sent=0,
                     prices_found=[],
+                    price_alerts=[],
                     errors=[],
                 )
             )

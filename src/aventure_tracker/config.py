@@ -128,6 +128,10 @@ class Settings(BaseSettings):
         """Get path to wishlist file."""
         return self.config_dir / "wishlist.yaml"
 
+    def get_destinations_path(self) -> Path:
+        """Get path to destinations (blacklist) configuration file."""
+        return self.config_dir / "destinations.yaml"
+
 
 # Global settings instance
 settings = Settings()
