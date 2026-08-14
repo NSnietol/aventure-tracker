@@ -102,6 +102,7 @@ class WeekendPair:
     return_options: list[ReturnOption]
     events: list  # list[MatchedEvent] — imported at runtime to avoid circular
     sunday_adventure: bool = False
+    return_only: bool = False  # True when only return flight is cheap (no cheap outbound)
 
     @property
     def recommended_return(self) -> ReturnOption | None:

@@ -747,10 +747,11 @@ class AdventureOrchestrator:
             pairs.append(WeekendPair(
                 window_start=window_start,
                 window_end=window_end,
-                outbound=ret_flight,  # Used as anchor for date display
+                outbound=ret_flight,  # anchor for date/window only
                 return_options=[return_option],
                 events=events,
                 sunday_adventure=self._has_sunday_events(events, window_start, window_end),
+                return_only=True,
             ))
 
         return pairs

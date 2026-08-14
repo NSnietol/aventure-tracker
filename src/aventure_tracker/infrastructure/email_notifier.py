@@ -199,26 +199,34 @@ def _build_html(pairs: list) -> str:
         outbound = pair.outbound
         events = pair.events
         sunday_flag = pair.sunday_adventure
+        return_only = getattr(pair, "return_only", False)
 
-        # --- Outbound row ---
-        ds_out = outbound.travel_date.strftime("%A %d de %B").capitalize()
-        star_out = " ★" if outbound.is_priority else ""
-        price_out = f"${outbound.price:,}".replace(",", ".")
-        outbound_row = f"""
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;background:#fff;border-radius:8px;border-left:4px solid #2d6a4f;">
-          <tr><td style="padding:14px 18px;">
-            <table width="100%"><tr>
-              <td>
-                <div style="font-size:15px;color:#333;margin-bottom:3px;">✈️ &nbsp;<strong>BAQ → MDE &nbsp;·&nbsp; {outbound.departure_time}</strong></div>
-                <div style="font-size:12px;color:#888;font-family:Arial,sans-serif;">{ds_out} · {outbound.airline}{star_out}</div>
-              </td>
-              <td style="text-align:right;white-space:nowrap;vertical-align:top;">
-                <div style="font-size:17px;font-weight:700;color:#2d6a4f;font-family:Arial,sans-serif;">{price_out}</div>
-                <div style="font-size:11px;color:#aaa;font-family:Arial,sans-serif;">COP</div>
-              </td>
-            </tr></table>
-          </td></tr>
-        </table>"""
+        # --- Outbound row (skip if return_only) ---
+        if return_only:
+            outbound_row = """
+            <div style="background:#fff8e1;border-left:3px solid #f9a825;padding:10px 14px;border-radius:6px;margin-bottom:10px;font-size:13px;color:#7c5f00;font-family:Arial,sans-serif;">
+              💡 <strong>Vuelta barata encontrada.</strong> No hay vuelo de ida bajo el umbral por ahora — monitorea los próximos días.
+            </div>"""
+        else:
+            # --- Outbound row ---
+            ds_out = outbound.travel_date.strftime("%A %d de %B").capitalize()
+            star_out = " ★" if outbound.is_priority else ""
+            price_out = f"${outbound.price:,}".replace(",", ".")
+            outbound_row = f"""
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;background:#fff;border-radius:8px;border-left:4px solid #2d6a4f;">
+              <tr><td style="padding:14px 18px;">
+                <table width="100%"><tr>
+                  <td>
+                    <div style="font-size:15px;color:#333;margin-bottom:3px;">✈️ &nbsp;<strong>BAQ → MDE &nbsp;·&nbsp; {outbound.departure_time}</strong></div>
+                    <div style="font-size:12px;color:#888;font-family:Arial,sans-serif;">{ds_out} · {outbound.airline}{star_out}</div>
+                  </td>
+                  <td style="text-align:right;white-space:nowrap;vertical-align:top;">
+                    <div style="font-size:17px;font-weight:700;color:#2d6a4f;font-family:Arial,sans-serif;">{price_out}</div>
+                    <div style="font-size:11px;color:#aaa;font-family:Arial,sans-serif;">COP</div>
+                  </td>
+                </tr></table>
+              </td></tr>
+            </table>"""
 
         # --- Return rows ---
         sunday_note = ""
@@ -279,9 +287,9 @@ def _build_html(pairs: list) -> str:
         else:
             return_rows = "<p style='font-size:13px;color:#e65100;font-family:Arial,sans-serif;'>⚠️ Sin vuelos de regreso encontrados para este finde.</p>"
 
-        # --- Total row ---
+        # --- Total row (skip if return_only — no outbound to sum) ---
         total_row = ""
-        if pair.total_price:
+        if pair.total_price and not return_only:
             total_str = f"${pair.total_price:,}".replace(",", ".")
             total_row = f"""
             <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
