@@ -1,7 +1,15 @@
 """Email notification service using Resend API."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+# Colombia timezone: UTC-5 (no DST)
+_TZ_COLOMBIA = timezone(timedelta(hours=-5))
+
+
+def _now_colombia() -> datetime:
+    """Return current datetime in Colombia timezone (UTC-5)."""
+    return datetime.now(_TZ_COLOMBIA)
 
 logger = logging.getLogger(__name__)
 
@@ -112,14 +120,13 @@ class EmailNotifier:
         Returns:
             True if email was sent successfully.
         """
-        now = datetime.now(timezone.utc)
-        generated_at = now.strftime("%d %b %Y · %H:%M UTC")
+        now = _now_colombia()
+        generated_at = now.strftime("%d %b %Y · %H:%M Col")
         error_count = len(errors)
 
         subject = (
             f"⚠️ Adventure Tracker falló · {error_count} error{'es' if error_count != 1 else ''} "
-            f"· {now.strftime('%d %b %Y')}"
-        )
+            f"· {now.strftime('%d %b %Y')}"        )
 
         html = _build_error_html(
             errors=errors,
@@ -178,7 +185,7 @@ def _event_emoji(name: str) -> str:
 def _build_html(pairs: list) -> str:
     """Build the Tropical/Adventure HTML email — one section per WeekendPair."""
 
-    generated_at = datetime.now().strftime("%d %b %Y · %H:%M")
+    generated_at = _now_colombia().strftime("%d %b %Y · %H:%M Col")
     n = len(pairs)
     all_dates = [p.outbound.travel_date for p in pairs]
     date_range = (
@@ -380,7 +387,7 @@ def _build_html(pairs: list) -> str:
 </table>
 </body></html>"""
 
-    generated_at = datetime.now().strftime("%d %b %Y · %H:%M")
+    generated_at = _now_colombia().strftime("%d %b %Y · %H:%M Col")
     n = len(weekends)
     date_range = ""
     all_dates = []
@@ -650,7 +657,7 @@ def _build_html(pairs: list) -> str:
           Sin eventos de agencias confirmados para esas fechas.
         </p>"""
 
-    generated_at = datetime.now().strftime("%d %b %Y · %H:%M")
+    generated_at = _now_colombia().strftime("%d %b %Y · %H:%M Col")
 
     return f"""<!DOCTYPE html>
 <html lang="es">
