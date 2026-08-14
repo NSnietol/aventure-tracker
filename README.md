@@ -75,7 +75,7 @@ inbox/brutal/        inbox/medellin-bungee/
 ### Instalación
 
 ```bash
-git clone https://github.com/yourusername/aventure-tracker.git
+git clone https://github.com/NSnietol/aventure-tracker.git
 cd aventure-tracker
 
 python -m venv .venv
