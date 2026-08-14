@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adventure Tracker — Error (Tropical)</title>
+</head>
+<body style="margin:0;padding:0;background:#fafaf8;font-family:Georgia,'Times New Roman',serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fafaf8;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+  <!-- HEADER BAND -->
+  <tr><td style="background:#1b4332;padding:12px 40px;border-radius:12px 12px 0 0;">
+    <table width="100%"><tr>
+      <td style="font-size:12px;color:#95d5b2;font-family:Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;">Adventure Tracker</td>
+      <td style="text-align:right;font-size:12px;color:#52b788;font-family:Arial,sans-serif;">13 Ago 2026 · 13:04 UTC</td>
+    </tr></table>
+  </td></tr>
+
+  <!-- HERO — ERROR STATE -->
+  <tr><td style="background:linear-gradient(180deg,#7f1d1d 0%,#991b1b 50%,#b91c1c 100%);padding:48px 40px 36px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
+    <h1 style="margin:0 0 6px;font-size:32px;font-weight:400;color:#ffffff;font-style:italic;">Algo salió mal</h1>
+    <p style="margin:0 0 24px;font-size:15px;color:#fca5a5;font-family:Arial,sans-serif;">El tracker encontró un error durante la ejecución</p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr><td style="background:rgba(0,0,0,0.25);border-radius:50px;padding:8px 24px;">
+        <span style="font-size:13px;color:#fecaca;font-family:Arial,sans-serif;font-weight:600;">🕐 Ejecución del 13 de Agosto, 2026</span>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- BODY -->
+  <tr><td style="background:#fafaf8;padding:36px 40px 40px;">
+
+    <!-- Intro -->
+    <p style="margin:0 0 28px;font-size:15px;color:#555;font-family:Arial,sans-serif;line-height:1.6;">
+      La ejecución programada del tracker completó con errores. Los detalles están abajo.
+      No se enviaron alertas de vuelos ni eventos en esta corrida.
+    </p>
+
+    <!-- Error principal -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;background:#fff;border-radius:8px;border-left:4px solid #dc2626;">
+      <tr><td style="padding:20px 22px;">
+        <table width="100%"><tr>
+          <td>
+            <div style="font-size:11px;color:#dc2626;font-family:Arial,sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Error crítico · Flight Tracker</div>
+            <div style="font-size:15px;color:#1f2937;margin-bottom:6px;font-family:Arial,sans-serif;">Google Flights scraper failed after 3 retries</div>
+            <div style="font-size:12px;color:#9ca3af;font-family:Arial,sans-serif;">TimeoutError: Navigation timeout of 30000ms exceeded</div>
+          </td>
+          <td style="text-align:right;white-space:nowrap;vertical-align:top;padding-left:16px;">
+            <div style="background:#fee2e2;border-radius:50px;padding:4px 12px;display:inline-block;">
+              <span style="font-size:11px;color:#dc2626;font-family:Arial,sans-serif;font-weight:700;">CRÍTICO</span>
+            </div>
+          </td>
+        </tr></table>
+      </td></tr>
+    </table>
+
+    <!-- Error secundario 1 -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;background:#fff;border-radius:8px;border-left:4px solid #f59e0b;">
+      <tr><td style="padding:20px 22px;">
+        <table width="100%"><tr>
+          <td>
+            <div style="font-size:11px;color:#d97706;font-family:Arial,sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Advertencia · Image Extractor</div>
+            <div style="font-size:15px;color:#1f2937;margin-bottom:6px;font-family:Arial,sans-serif;">Gemini API returned no response for 2 images</div>
+            <div style="font-size:12px;color:#9ca3af;font-family:Arial,sans-serif;">brutal/48b8909a.png · brutal/544af8c5.png</div>
+          </td>
+          <td style="text-align:right;white-space:nowrap;vertical-align:top;padding-left:16px;">
+            <div style="background:#fef3c7;border-radius:50px;padding:4px 12px;display:inline-block;">
+              <span style="font-size:11px;color:#d97706;font-family:Arial,sans-serif;font-weight:700;">WARN</span>
+            </div>
+          </td>
+        </tr></table>
+      </td></tr>
+    </table>
+
+    <!-- Error secundario 2 -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;background:#fff;border-radius:8px;border-left:4px solid #f59e0b;">
+      <tr><td style="padding:20px 22px;">
+        <table width="100%"><tr>
+          <td>
+            <div style="font-size:11px;color:#d97706;font-family:Arial,sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Advertencia · State Manager</div>
+            <div style="font-size:15px;color:#1f2937;margin-bottom:6px;font-family:Arial,sans-serif;">Failed to sync state to Gist</div>
+            <div style="font-size:12px;color:#9ca3af;font-family:Arial,sans-serif;">ConnectionError: Max retries exceeded (gist.github.com)</div>
+          </td>
+          <td style="text-align:right;white-space:nowrap;vertical-align:top;padding-left:16px;">
+            <div style="background:#fef3c7;border-radius:50px;padding:4px 12px;display:inline-block;">
+              <span style="font-size:11px;color:#d97706;font-family:Arial,sans-serif;font-weight:700;">WARN</span>
+            </div>
+          </td>
+        </tr></table>
+      </td></tr>
+    </table>
+
+    <!-- Resumen de la corrida -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;background:#f3f4f6;border-radius:8px;">
+      <tr><td style="padding:20px 22px;">
+        <div style="font-size:11px;color:#6b7280;font-family:Arial,sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Resumen de la corrida</div>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="font-size:13px;color:#6b7280;font-family:Arial,sans-serif;padding-bottom:8px;">Modo</td>
+            <td style="font-size:13px;color:#1f2937;font-family:Arial,sans-serif;font-weight:600;text-align:right;padding-bottom:8px;">all</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#6b7280;font-family:Arial,sans-serif;padding-bottom:8px;">Duración</td>
+            <td style="font-size:13px;color:#1f2937;font-family:Arial,sans-serif;font-weight:600;text-align:right;padding-bottom:8px;">47.3s</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#6b7280;font-family:Arial,sans-serif;padding-bottom:8px;">Rutas revisadas</td>
+            <td style="font-size:13px;color:#1f2937;font-family:Arial,sans-serif;font-weight:600;text-align:right;padding-bottom:8px;">0 / 2</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#6b7280;font-family:Arial,sans-serif;padding-bottom:8px;">Alertas generadas</td>
+            <td style="font-size:13px;color:#1f2937;font-family:Arial,sans-serif;font-weight:600;text-align:right;padding-bottom:8px;">0</td>
+          </tr>
+          <tr>
+            <td style="font-size:13px;color:#6b7280;font-family:Arial,sans-serif;">Errores totales</td>
+            <td style="font-size:13px;color:#dc2626;font-family:Arial,sans-serif;font-weight:700;text-align:right;">3</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <!-- CTA -->
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="text-align:center;">
+          <a href="https://github.com/nilsonnieto/aventure-tracker/actions" style="display:inline-block;background:#1b4332;color:#d8f3dc;text-decoration:none;padding:14px 40px;border-radius:4px;font-size:14px;font-family:Arial,sans-serif;font-weight:600;letter-spacing:0.5px;">Ver logs en GitHub Actions →</a>
+        </td>
+      </tr>
+    </table>
+
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background:#1b4332;border-radius:0 0 12px 12px;padding:18px 40px;text-align:center;">
+    <p style="margin:0;font-size:12px;color:#52b788;font-family:Arial,sans-serif;">Adventure Tracker · Solo te avisa cuando vale la pena ✌️</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

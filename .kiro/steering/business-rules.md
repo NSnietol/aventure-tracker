@@ -17,8 +17,9 @@ Cada vez que modifiques lógica de dominio en este proyecto, actualiza `docs/bus
 ### Notificaciones
 - Canal activo: **email únicamente** (Resend API). Telegram está descartado por ahora.
 - No configurar `TELEGRAM_BOT_TOKEN` ni `TELEGRAM_CHAT_ID` en producción.
-- Las notificaciones de fallos del sistema también van por email.
-- **Deuda técnica**: el workflow `tracker.yaml` notifica fallos vía `curl` a Telegram → pendiente migrar a email.
+- Errores dentro del proceso → orquestador llama `send_error_report()` al final de `run()`.
+- Crash total del CI job → job `notify-failure` en `tracker.yaml` llama `send_error_report()` con mensaje genérico.
+- Secrets requeridos: `RESEND_API_KEY`, `EMAIL_TO`, `GIST_ID`, `GIST_TOKEN`.
 - Rutas: **BAQ→MDE** (ida, jue/vie) y **MDE→BAQ** (vuelta, dom/lun).
 - Precios son **one-way** por tramo. Umbral: 300,000 COP.
 - Política de aerolíneas (orden de precedencia):

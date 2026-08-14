@@ -250,7 +250,42 @@ Un viernes es **puente** (`is_bridge = True`) si:
 
 - El código de `TelegramNotifier` existe pero **Telegram no es el canal de notificaciones activo**.
 - No configurar `TELEGRAM_BOT_TOKEN` ni `TELEGRAM_CHAT_ID` en producción.
-- La notificación de fallo en `tracker.yaml` (workflow de GitHub Actions) que usa `curl` directo a Telegram también debe migrarse a email cuando se implemente.
+- La notificación de fallo en `tracker.yaml` (workflow de GitHub Actions) que usaba `curl` directo a Telegram fue reemplazada por email.
+
+### 7.3 Procedimiento de notificación de errores
+
+Existen **dos niveles** de detección de fallos, cada uno con su propio mecanismo:
+
+#### Nivel 1 — Errores dentro de una ejecución exitosa del proceso
+
+El orquestador completa su ciclo pero acumula errores en la lista `errors`. Al finalizar `run()`:
+
+1. Si `errors` es no vacío **y** `EmailNotifier` está configurado → se llama `send_error_report()`.
+2. El email incluye cada error clasificado automáticamente como `CRÍTICO` o `WARN`:
+   - El primer error siempre es `CRÍTICO`.
+   - Errores que contengan keywords (`warning`, `warn`, `failed to sync`, `no response`, `skipping`) → `WARN`.
+   - El resto → `CRÍTICO`.
+3. El email incluye el resumen de la corrida (modo, duración, rutas revisadas, alertas generadas).
+4. Si hay `GITHUB_RUN_ID` en el entorno → el email incluye un enlace directo al run de GitHub Actions.
+
+#### Nivel 2 — Crash total del job de CI (el proceso no llega a terminar)
+
+El workflow `tracker.yaml` tiene un job `notify-failure` que se activa con `if: failure()`:
+
+1. Instala el paquete con `pip install -e .`.
+2. Ejecuta un script Python inline que llama `send_error_report()` con un mensaje genérico de crash.
+3. Construye el `run_url` desde las variables de entorno de GitHub Actions (`GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`).
+
+#### Secrets requeridos en GitHub Actions
+
+| Secret         | Propósito                          |
+|----------------|------------------------------------|
+| `RESEND_API_KEY` | Autenticación con la API de Resend |
+| `EMAIL_TO`       | Destinatario de los emails         |
+| `GIST_ID`        | Persistencia de estado en Gist     |
+| `GIST_TOKEN`     | PAT con scope `gist`               |
+
+Los secrets `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` ya no se usan y pueden eliminarse de la configuración del repositorio.
 
 ### 7.3 Formato del email
 
@@ -324,8 +359,8 @@ Un viernes es **puente** (`is_bridge = True`) si:
 
 ### 10.3 Fallos
 
-- Si el tracker falla → la notificación de fallo debe ir por **email** (Resend), no por Telegram.
-- El workflow actual (`tracker.yaml`) usa `curl` directo a Telegram para notificar fallos — esto es deuda técnica pendiente de migrar a email.
+- Si el job de CI falla → el job `notify-failure` en `tracker.yaml` envía un email de error vía `send_error_report()`.
+- Si el proceso completa pero con errores internos → el orquestador mismo envía el email de error al final de `run()`.
 - Los logs y playwright-reports se guardan como artefactos por **7 días** en caso de fallo.
 
 ---

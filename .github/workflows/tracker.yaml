@@ -23,8 +23,8 @@ on:
 
 env:
   CI: true
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+  EMAIL_TO: ${{ secrets.EMAIL_TO }}
   GITHUB_GIST_ID: ${{ secrets.GIST_ID }}
   GITHUB_GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
 
@@ -93,12 +93,52 @@ jobs:
     if: failure()
 
     steps:
-      - name: Send failure notification
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d parse_mode="HTML" \
-            -d text="<b>Adventure Tracker Failed</b>%0A%0AWorkflow run failed. Check GitHub Actions for details.%0A%0A<a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View Run</a>"
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Send failure email
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          python - <<'EOF'
+          import os
+          from aventure_tracker.infrastructure.email_notifier import EmailNotifier
+
+          api_key = os.environ.get("RESEND_API_KEY", "")
+          email_to = os.environ.get("EMAIL_TO", "")
+
+          if not api_key or not email_to:
+              print("Email not configured, skipping failure notification")
+              exit(0)
+
+          notifier = EmailNotifier(api_key=api_key, to_email=email_to)
+
+          server = os.environ.get("GITHUB_SERVER_URL", "")
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          run_url = f"{server}/{repo}/actions/runs/{run_id}" if server and repo and run_id else ""
+
+          notifier.send_error_report(
+              errors=["CI job failed — el proceso del tracker no completó. Revisa los logs para más detalles."],
+              mode="all",
+              duration_seconds=0.0,
+              routes_checked=0,
+              routes_total=2,
+              alerts_generated=0,
+              run_url=run_url,
+          )
+          print("Failure email sent")
+          EOF

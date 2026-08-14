@@ -15,8 +15,8 @@ on:
 
 env:
   CI: true
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+  EMAIL_TO: ${{ secrets.EMAIL_TO }}
   GITHUB_GIST_ID: ${{ secrets.GIST_ID }}
   GITHUB_GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
 

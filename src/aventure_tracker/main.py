@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -295,7 +296,7 @@ class AdventureOrchestrator:
                     self._state_manager.write()
                     self._logger.info("State saved successfully")
                 except Exception as e:
-                    error = f"Failed to save state: {e}"
+                    error = f"State Manager: Failed to save state: {e}"
                     self._logger.error(error)
                     errors.append(error)
 
@@ -317,6 +318,33 @@ class AdventureOrchestrator:
             total_notifications += activities_result.notifications_sent
 
         duration = (datetime.now() - start_time).total_seconds()
+
+        # Send error report if there were errors and email notifier is available
+        if errors and self._email_notifier:
+            try:
+                routes_checked = flights_result.routes_checked if flights_result else 0
+                run_url = os.environ.get(
+                    "GITHUB_SERVER_URL", ""
+                )
+                repo = os.environ.get("GITHUB_REPOSITORY", "")
+                run_id = os.environ.get("GITHUB_RUN_ID", "")
+                if run_url and repo and run_id:
+                    run_url = f"{run_url}/{repo}/actions/runs/{run_id}"
+                else:
+                    run_url = ""
+
+                self._email_notifier.send_error_report(
+                    errors=errors,
+                    mode=self._mode.value,
+                    duration_seconds=duration,
+                    routes_checked=routes_checked,
+                    routes_total=2,  # BAQ→MDE + MDE→BAQ
+                    alerts_generated=total_alerts,
+                    run_url=run_url,
+                )
+                self._logger.info(f"Error report sent via email ({len(errors)} errors)")
+            except Exception as e:
+                self._logger.error(f"Failed to send error report email: {e}")
 
         result = OrchestratorResult(
             mode=self._mode,
