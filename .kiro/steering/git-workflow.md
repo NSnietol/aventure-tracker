@@ -52,11 +52,12 @@ For larger changes, use a feature branch and PR.
 
 ## CI Workflows
 
-| Workflow | Trigger | What it does |
-|----------|---------|--------------|
-| `ci.yaml` | push/PR to main | Runs tests on Python 3.12 + 3.13, linting |
-| `tracker.yaml` | Daily 8AM Colombia + manual | Full tracker run (flights + extraction) |
-| `flights-only.yaml` | 7AM + 7PM Colombia + manual | Only flight tracking |
+| Workflow | Trigger | Tiempo estimado | Qué hace |
+|----------|---------|----------------|----------|
+| `quality-gate.yaml` | Push/PR a main | ~3 min | Lint + unit tests (sin Playwright, sin Tesseract) |
+| `tracker.yaml` | Daily 8AM Colombia + manual | ~15-20 min | Extracción imágenes + vuelos + email |
+
+**Quality gate es bloqueante para merge.** Tracker corre en background independiente.
 
 Required GitHub secrets: `RESEND_API_KEY`, `EMAIL_TO`, `GIST_ID`, `GIST_TOKEN`, `GEMINI_API_KEY`
 

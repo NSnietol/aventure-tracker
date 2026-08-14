@@ -1,0 +1,50 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    name: Lint + Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # Tesseract is NOT installed — tests that need it are mocked
+      # Playwright is NOT installed — scrapers are mocked in unit tests
+
+      - name: Lint (ruff)
+        run: ruff check src/ tests/
+
+      - name: Format check (ruff)
+        run: ruff format --check src/ tests/
+
+      - name: Unit tests
+        run: |
+          pytest tests/ \
+            --tb=short \
+            --no-header \
+            -q \
+            --cov=src \
+            --cov-report=term-missing:skip-covered \
+            --cov-fail-under=70
