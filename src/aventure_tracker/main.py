@@ -264,7 +264,7 @@ class AdventureOrchestrator:
                     if flights_result.price_alerts:
                         self._logger.info("Step 3/3: Building consolidated report...")
                         await self._send_consolidated_report(flights_result)
-                        if self._notifier or self._email_notifier:
+                        if self._email_notifier:
                             flights_result.notifications_sent = 1
                     else:
                         self._logger.info("Step 3/3: No cheap flights — no report sent")
@@ -480,6 +480,13 @@ class AdventureOrchestrator:
         # Build WeekendPair list
         pairs = self._build_weekend_pairs(outbound_all, return_all, weekend_matches)
 
+        # If no outbound found but return flights are cheap → report return-only pairs
+        if not pairs and return_all:
+            self._logger.info(
+                f"No cheap outbound flights — reporting {len(return_all)} return-only option(s)"
+            )
+            pairs = self._build_return_only_pairs(return_all, weekend_matches)
+
         self._logger.info(f"Built {len(pairs)} weekend pair(s)")
         for p in pairs:
             ret = p.recommended_return
@@ -686,6 +693,64 @@ class AdventureOrchestrator:
                 return_options=return_options,
                 events=events,
                 sunday_adventure=sunday_adv,
+            ))
+
+        return pairs
+
+    def _build_return_only_pairs(
+        self,
+        return_all: list,
+        weekend_matches: list,
+    ) -> list:
+        """Build WeekendPair list when only return flights are cheap (no cheap outbound).
+
+        Creates one pair per return flight showing the cheap return option
+        and matching events for that weekend window.
+
+        Args:
+            return_all: Cheap return flights sorted by date.
+            weekend_matches: WeekendMatch objects with events per window.
+
+        Returns:
+            List of WeekendPair (outbound will be None-like, return is the alert).
+        """
+        from aventure_tracker.services.flight_tracker import WeekendPair, ReturnOption
+        from datetime import timedelta
+
+        match_by_window: dict = {}
+        for m in weekend_matches:
+            match_by_window[m.window_start] = m
+
+        pairs = []
+        seen_windows: set = set()
+
+        for ret_flight in return_all:
+            # Window: return date - 4 days (approx Thu of that weekend)
+            window_start = ret_flight.travel_date - timedelta(days=4)
+            if window_start in seen_windows:
+                continue
+            seen_windows.add(window_start)
+
+            window_end = ret_flight.travel_date + timedelta(days=1)
+            match = match_by_window.get(window_start)
+            events = match.events if match else []
+
+            # Wrap the return flight as a ReturnOption
+            return_option = ReturnOption(
+                flight=ret_flight,
+                is_recommended=True,
+                savings_vs_priority=None,
+            )
+
+            # Create a synthetic "outbound" placeholder pointing to same weekend
+            # We reuse the return flight as the "anchor" for display
+            pairs.append(WeekendPair(
+                window_start=window_start,
+                window_end=window_end,
+                outbound=ret_flight,  # Used as anchor for date display
+                return_options=[return_option],
+                events=events,
+                sunday_adventure=self._has_sunday_events(events, window_start, window_end),
             ))
 
         return pairs
