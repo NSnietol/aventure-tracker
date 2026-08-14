@@ -53,33 +53,36 @@ class EmailNotifier:
 
     def send_weekend_report(
         self,
-        outbound_flights: list,
-        return_flights: list,
-        weekend_matches: list,
+        weekends: list[dict],
     ) -> bool:
-        """Send consolidated weekend report: cheap flights + available events.
+        """Send consolidated weekend report segmented by weekend.
+
+        Each weekend dict contains:
+            window_start: date
+            window_end: date
+            outbound: list[FlightFound]  (BAQ→MDE)
+            returns: list[FlightFound]   (MDE→BAQ)
+            events: list[MatchedEvent]
 
         Args:
-            outbound_flights: List of FlightFound for outbound (BAQ→MDE).
-            return_flights: List of FlightFound for return (MDE→BAQ).
-            weekend_matches: List of WeekendMatch with matched events.
+            weekends: List of weekend segments, one per cheap weekend found.
 
         Returns:
             True if sent successfully.
         """
-        # Build subject with dates
-        all_dates = (
-            [f.travel_date for f in outbound_flights]
-            + [f.travel_date for f in return_flights]
-        )
+        if not weekends:
+            return False
+
+        # Subject: date range across all weekends
+        all_dates = []
+        for w in weekends:
+            all_dates.extend([f.travel_date for f in w["outbound"] + w["returns"]])
         if all_dates:
-            min_date = min(all_dates).strftime("%d %b")
-            max_date = max(all_dates).strftime("%d %b %Y")
-            subject = f"✈️ Finde barato detectado · {min_date}–{max_date}"
+            subject = f"✈️ {len(weekends)} finde(s) barato(s) · {min(all_dates).strftime('%d %b')}–{max(all_dates).strftime('%d %b %Y')}"
         else:
             subject = "✈️ Finde barato detectado!"
 
-        html = _build_html(outbound_flights, return_flights, weekend_matches)
+        html = _build_html(weekends)
         return self._send(subject, html)
 
     def send_test_message(self) -> bool:
@@ -124,27 +127,182 @@ def _event_emoji(name: str) -> str:
     return "🏕"
 
 
-def _build_html(
-    outbound_flights: list,
-    return_flights: list,
-    weekend_matches: list,
-) -> str:
-    """Build the Tropical/Adventure HTML email (Maqueta 3 style)."""
+def _build_html(weekends: list[dict]) -> str:
+    """Build the Tropical/Adventure HTML email segmented by weekend."""
 
-    # --- date range label ---
-    all_dates = (
-        [f.travel_date for f in outbound_flights]
-        + [f.travel_date for f in return_flights]
-    )
+    generated_at = datetime.now().strftime("%d %b %Y · %H:%M")
+    n = len(weekends)
+    date_range = ""
+    all_dates = []
+    for w in weekends:
+        all_dates.extend([f.travel_date for f in w["outbound"] + w["returns"]])
     if all_dates:
-        min_d = min(all_dates)
-        max_d = max(all_dates)
-        if min_d.month == max_d.month:
-            date_range = f"{min_d.day}–{max_d.strftime('%d de %B, %Y')}"
+        mn, mx = min(all_dates), max(all_dates)
+        date_range = f"{mn.strftime('%d %b')}–{mx.strftime('%d %b %Y')}"
+
+    # Build one section per weekend
+    weekend_sections = ""
+    for idx, w in enumerate(weekends):
+        ws = w["window_start"]
+        we = w["window_end"]
+        label = f"{ws.strftime('%d')}–{we.strftime('%d %b %Y')}"
+        outbound = w["outbound"]
+        returns = w["returns"]
+        events = w["events"]
+
+        # Pair total for this weekend
+        total = sum(f.price for f in outbound + returns)
+        total_str = f"${total:,}".replace(",", ".") if total else ""
+
+        # Flight rows
+        flight_rows = ""
+        for f in outbound:
+            ds = f.travel_date.strftime("%A %d de %B").capitalize()
+            star = " ★" if f.is_priority else ""
+            price_str = f"${f.price:,}".replace(",", ".")
+            flight_rows += f"""
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;background:#fff;border-radius:8px;border-left:4px solid #2d6a4f;">
+              <tr><td style="padding:14px 18px;">
+                <table width="100%"><tr>
+                  <td>
+                    <div style="font-size:15px;color:#333;margin-bottom:3px;">✈️ &nbsp;<strong>BAQ → MDE &nbsp;·&nbsp; {f.departure_time}</strong></div>
+                    <div style="font-size:12px;color:#888;font-family:Arial,sans-serif;">{ds} · {f.airline}{star}</div>
+                  </td>
+                  <td style="text-align:right;white-space:nowrap;vertical-align:top;">
+                    <div style="font-size:17px;font-weight:700;color:#2d6a4f;font-family:Arial,sans-serif;">{price_str}</div>
+                    <div style="font-size:11px;color:#aaa;font-family:Arial,sans-serif;">COP</div>
+                  </td>
+                </tr></table>
+              </td></tr>
+            </table>"""
+
+        for f in returns:
+            ds = f.travel_date.strftime("%A %d de %B").capitalize()
+            star = " ★" if f.is_priority else ""
+            price_str = f"${f.price:,}".replace(",", ".")
+            flight_rows += f"""
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;background:#fff;border-radius:8px;border-left:4px solid #40916c;">
+              <tr><td style="padding:14px 18px;">
+                <table width="100%"><tr>
+                  <td>
+                    <div style="font-size:15px;color:#333;margin-bottom:3px;">🔄 &nbsp;<strong>MDE → BAQ &nbsp;·&nbsp; {f.departure_time}</strong></div>
+                    <div style="font-size:12px;color:#888;font-family:Arial,sans-serif;">{ds} · {f.airline}{star}</div>
+                  </td>
+                  <td style="text-align:right;white-space:nowrap;vertical-align:top;">
+                    <div style="font-size:17px;font-weight:700;color:#40916c;font-family:Arial,sans-serif;">{price_str}</div>
+                    <div style="font-size:11px;color:#aaa;font-family:Arial,sans-serif;">COP</div>
+                  </td>
+                </tr></table>
+              </td></tr>
+            </table>"""
+
+        # Total for this weekend
+        total_row = ""
+        if total_str:
+            total_row = f"""
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;">
+              <tr>
+                <td style="font-size:13px;color:#888;font-family:Arial,sans-serif;">Ida + Vuelta este finde</td>
+                <td style="text-align:right;">
+                  <span style="font-size:20px;font-weight:700;color:#1b4332;font-family:Arial,sans-serif;">{total_str}</span>
+                  <span style="font-size:12px;color:#888;font-family:Arial,sans-serif;"> COP</span>
+                </td>
+              </tr>
+            </table>"""
+
+        # Event rows
+        event_rows = ""
+        if events:
+            for i, ev in enumerate(events[:6]):
+                color = _EVENT_COLORS[i % len(_EVENT_COLORS)]
+                emoji = _event_emoji(ev.name)
+                event_rows += f"""
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;background:#fff;border-radius:8px;border-left:4px solid {color};">
+                  <tr><td style="padding:14px 18px;">
+                    <table width="100%"><tr>
+                      <td>
+                        <div style="font-size:15px;color:#333;margin-bottom:3px;">{emoji} &nbsp;<strong>{ev.name}</strong></div>
+                        <div style="font-size:12px;color:#888;font-family:Arial,sans-serif;">@{ev.agency} &nbsp;·&nbsp; {ev.date_label}</div>
+                      </td>
+                      <td style="text-align:right;white-space:nowrap;vertical-align:top;">
+                        <div style="font-size:16px;font-weight:700;color:{color};font-family:Arial,sans-serif;">{ev.price_formatted}</div>
+                      </td>
+                    </tr></table>
+                  </td></tr>
+                </table>"""
         else:
-            date_range = f"{min_d.strftime('%d %b')}–{max_d.strftime('%d %b %Y')}"
-    else:
-        date_range = datetime.now().strftime("%B %Y")
+            event_rows = "<p style='font-size:13px;color:#aaa;font-family:Arial,sans-serif;font-style:italic;'>Sin eventos confirmados para estas fechas.</p>"
+
+        # Divider between weekends (not after last one)
+        divider = '<hr style="border:none;border-top:2px dashed #d8f3dc;margin:32px 0;">' if idx < len(weekends) - 1 else ""
+
+        weekend_sections += f"""
+        <!-- WEEKEND {idx+1} -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+          <tr>
+            <td style="border-left:4px solid #2d6a4f;padding-left:14px;">
+              <div style="font-size:11px;color:#888;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Finde {idx+1} de {n}</div>
+              <div style="font-size:20px;color:#1b4332;font-weight:400;">📅 {label}</div>
+            </td>
+          </tr>
+        </table>
+        <div style="margin:16px 0 8px;">{flight_rows}</div>
+        {total_row}
+        <div style="text-align:center;padding:12px 0 16px;">
+          <span style="font-size:11px;color:#aaa;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:2px;">— Planes ese finde —</span>
+        </div>
+        {event_rows}
+        {divider}"""
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#fafaf8;font-family:Georgia,'Times New Roman',serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#fafaf8;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+  <!-- HEADER -->
+  <tr><td style="background:#1b4332;padding:12px 40px;border-radius:12px 12px 0 0;">
+    <table width="100%"><tr>
+      <td style="font-size:12px;color:#95d5b2;font-family:Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;">Adventure Tracker</td>
+      <td style="text-align:right;font-size:12px;color:#52b788;font-family:Arial,sans-serif;">{generated_at}</td>
+    </tr></table>
+  </td></tr>
+
+  <!-- HERO -->
+  <tr><td style="background:linear-gradient(180deg,#2d6a4f 0%,#40916c 60%,#52b788 100%);padding:48px 40px 36px;text-align:center;">
+    <div style="font-size:44px;margin-bottom:12px;">🌄</div>
+    <h1 style="margin:0 0 6px;font-size:34px;font-weight:400;color:#ffffff;font-style:italic;">¡A empacar!</h1>
+    <p style="margin:0 0 24px;font-size:15px;color:#b7e4c7;font-family:Arial,sans-serif;">{n} finde{"s" if n > 1 else ""} barato{"s" if n > 1 else ""} encontrado{"s" if n > 1 else ""}</p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr><td style="background:rgba(0,0,0,0.25);border-radius:50px;padding:8px 24px;">
+        <span style="font-size:14px;color:#d8f3dc;font-family:Arial,sans-serif;font-weight:600;">📅 {date_range}</span>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- BODY -->
+  <tr><td style="background:#fafaf8;padding:36px 40px 40px;">
+    {weekend_sections}
+
+    <!-- CTA -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;">
+      <tr><td style="text-align:center;">
+        <a href="https://www.google.com/travel/flights" style="display:inline-block;background:#1b4332;color:#d8f3dc;text-decoration:none;padding:14px 44px;border-radius:4px;font-size:14px;font-family:Arial,sans-serif;font-weight:600;letter-spacing:0.5px;">Ver vuelos en Google Flights →</a>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background:#1b4332;border-radius:0 0 12px 12px;padding:18px 40px;text-align:center;">
+    <p style="margin:0;font-size:12px;color:#52b788;font-family:Arial,sans-serif;">Adventure Tracker · Solo te avisa cuando vale la pena ✌️</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>"""
 
     # --- total price ---
     total_price = sum(f.price for f in outbound_flights + return_flights)

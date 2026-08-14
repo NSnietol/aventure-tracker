@@ -404,81 +404,91 @@ class AdventureOrchestrator:
     async def _send_consolidated_report(
         self, flights_result: FlightTrackerResult
     ) -> None:
-        """Build and send a consolidated weekend report.
+        """Build and send a consolidated weekend report, segmented by weekend.
 
-        Runs event extraction from the cache, matches events to cheap flight
-        dates, and sends a single Telegram message with flights + events.
+        Groups cheap flights into weekend windows (Thu→Mon), pairs each
+        outbound flight with the matching return flight for that week,
+        matches agency events, and sends ONE email with one section per weekend.
 
         Args:
             flights_result: Result from flight tracker with price_alerts.
         """
         from aventure_tracker.services.flight_tracker import FlightFound
+        from datetime import timedelta
 
         alerts = flights_result.price_alerts
         self._logger.info(
             f"Building consolidated report for {len(alerts)} cheap flight(s)"
         )
 
-        # Collect cheap flights by direction
-        outbound: list[FlightFound] = []
-        return_flights: list[FlightFound] = []
-        cheap_dates = []
-
+        # Separate by direction
+        outbound_all: list[FlightFound] = []
+        return_all: list[FlightFound] = []
         for alert in alerts:
             f = alert.flight
-            cheap_dates.append(f.travel_date)
-            if "BAQ" in f.route and f.route.endswith("MDE"):
-                outbound.append(f)
+            if "BAQ" in f.route and "MDE" in f.route and f.route.index("BAQ") < f.route.index("MDE"):
+                outbound_all.append(f)
             else:
-                return_flights.append(f)
+                return_all.append(f)
 
-        # Sort by date
-        outbound.sort(key=lambda x: (x.travel_date, x.departure_time))
-        return_flights.sort(key=lambda x: (x.travel_date, x.departure_time))
+        outbound_all.sort(key=lambda x: (x.travel_date, x.departure_time))
+        return_all.sort(key=lambda x: (x.travel_date, x.departure_time))
 
         # Match events from extraction cache
-        matcher = EventMatcher(
-            destinations_path=self._settings.get_destinations_path(),
-        )
+        all_cheap_dates = [f.travel_date for f in outbound_all + return_all]
+        matcher = EventMatcher(destinations_path=self._settings.get_destinations_path())
         matcher.load()
-        weekend_matches = matcher.find_events_for_dates(cheap_dates)
+        weekend_matches = matcher.find_events_for_dates(all_cheap_dates)
 
-        total_events = sum(len(m.events) for m in weekend_matches)
+        # Build weekend segments: group outbound+return+events by week window
+        # Each window is window_start → window_start+4 days
+        weekends: list[dict] = []
+        for match in weekend_matches:
+            ws = match.window_start
+            we = match.window_end
+            # Outbound flights that fall in this window
+            ida = [f for f in outbound_all if ws <= f.travel_date <= we]
+            # Return flights that fall in this window
+            vuelta = [f for f in return_all if ws <= f.travel_date <= we]
+            if not ida and not vuelta:
+                continue
+            weekends.append({
+                "window_start": ws,
+                "window_end": we,
+                "outbound": ida,
+                "returns": vuelta,
+                "events": match.events,
+            })
+
+        total_events = sum(len(w["events"]) for w in weekends)
         self._logger.info(
-            f"Found {total_events} matching events across "
-            f"{len(weekend_matches)} weekend windows"
+            f"Found {total_events} events across {len(weekends)} weekend(s)"
         )
 
-        # Send single consolidated notification
+        # Log to console if no notifier
+        if not self._notifier and not self._email_notifier:
+            self._logger.info("=== WEEKEND REPORT (no notifier) ===")
+            for w in weekends:
+                label = f"{w['window_start'].strftime('%d')}-{w['window_end'].strftime('%d %b %Y')}"
+                self._logger.info(f"Finde {label}:")
+                for f in w["outbound"]:
+                    self._logger.info(f"  Ida:    {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
+                for f in w["returns"]:
+                    self._logger.info(f"  Vuelta: {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
+                for ev in w["events"][:4]:
+                    self._logger.info(f"  • {ev.name} ({ev.date_label}) {ev.price_formatted}")
+            self._logger.info("===================================")
+            return
+
+        # Send notifications
         if self._notifier:
             self._notifier.send_weekend_report(
-                outbound_flights=outbound,
-                return_flights=return_flights,
+                outbound_flights=outbound_all,
+                return_flights=return_all,
                 weekend_matches=weekend_matches,
             )
         if self._email_notifier:
-            self._email_notifier.send_weekend_report(
-                outbound_flights=outbound,
-                return_flights=return_flights,
-                weekend_matches=weekend_matches,
-            )
-        if not self._notifier and not self._email_notifier:
-            # Log to console when no notifier configured
-            self._logger.info("=== WEEKEND REPORT (no notifier) ===")
-            if outbound:
-                self._logger.info("Ida (BAQ→MDE):")
-                for f in outbound:
-                    self._logger.info(f"  {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
-            if return_flights:
-                self._logger.info("Vuelta (MDE→BAQ):")
-                for f in return_flights:
-                    self._logger.info(f"  {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
-            for match in weekend_matches:
-                if match.has_events:
-                    self._logger.info(f"Planes {match.date_label}:")
-                    for ev in match.events[:5]:
-                        self._logger.info(f"  • {ev.name} ({ev.date_label}) {ev.price_formatted}")
-            self._logger.info("===================================")
+            self._email_notifier.send_weekend_report(weekends=weekends)
 
     def _show_flight_calendar(
         self,
