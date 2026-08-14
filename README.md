@@ -61,16 +61,16 @@ GEMINI_API_KEY=tu_gemini_key
 
 ```bash
 # Busca vuelos baratos + cruza con eventos + envía email si hay alerta
-python src/aventure_tracker/main.py --mode flights
+aventure-tracker --mode flights
 
 # Con más semanas de anticipación
-python src/aventure_tracker/main.py --mode flights --weeks 4
+aventure-tracker --mode flights --weeks 4
 
 # Sin enviar notificaciones (solo ver resultados)
-python src/aventure_tracker/main.py --mode flights --dry-run
+aventure-tracker --mode flights --dry-run
 
 # Con logs detallados
-python src/aventure_tracker/main.py --mode flights --verbose
+aventure-tracker --mode flights --verbose
 ```
 
 ### Extraer eventos de agencias
@@ -93,13 +93,13 @@ python scripts/extract_events.py --cache-stats
 
 ```bash
 # Ver solo actividades de Instagram (sin vuelos)
-python src/aventure_tracker/main.py --mode activities
+aventure-tracker --mode activities
 
 # Mostrar calendario de vuelos
-python src/aventure_tracker/main.py --mode calendar
+aventure-tracker --mode calendar
 
 # Ejecutar todo (vuelos + actividades)
-python src/aventure_tracker/main.py --mode all
+aventure-tracker
 ```
 
 ## Flujo completo
@@ -110,7 +110,7 @@ python src/aventure_tracker/main.py --mode all
    Lee inbox/brutal/ + inbox/medellin-bungee/
    Extrae eventos con Gemini → guarda en data/extraction_cache.yaml
 
-2. python src/aventure_tracker/main.py --mode flights
+2. aventure-tracker --mode flights
         ↓
    Busca vuelos baratos en Google Flights (próximos weekends)
         ↓
