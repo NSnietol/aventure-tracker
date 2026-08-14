@@ -96,7 +96,14 @@ EMAIL_TO=tu@email.com
 
 # Extracción de imágenes (opcional, más rápido que Ollama)
 GEMINI_API_KEY=tu_gemini_key
+
+# Threshold overrides (opcional — si no se definen, se usan los valores de config/routes.yaml)
+# FLIGHT_PRICE_THRESHOLD=300000     # Precio máximo por tramo en COP (aplica a todas las rutas)
+# FLIGHT_BARGAIN_THRESHOLD=110000   # Cualquier aerolínea se incluye si precio ≤ este valor
+# FLIGHT_EXTRA_MAX_PRICE=150000     # Precio máximo para aerolíneas extra (Wingo, JetSMART, Avianca)
 ```
+
+Las variables de threshold también se pueden configurar como **GitHub Secrets** para controlar el comportamiento en CI sin tocar el código.
 
 ## Comandos
 
