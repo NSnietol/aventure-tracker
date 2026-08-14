@@ -19,6 +19,10 @@ env:
   GITHUB_GIST_ID: ${{ secrets.GIST_ID }}
   GITHUB_GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  # Optional threshold overrides (leave unset to use routes.yaml values)
+  FLIGHT_PRICE_THRESHOLD: ${{ secrets.FLIGHT_PRICE_THRESHOLD }}
+  FLIGHT_BARGAIN_THRESHOLD: ${{ secrets.FLIGHT_BARGAIN_THRESHOLD }}
+  FLIGHT_EXTRA_MAX_PRICE: ${{ secrets.FLIGHT_EXTRA_MAX_PRICE }}
 
 jobs:
   run:

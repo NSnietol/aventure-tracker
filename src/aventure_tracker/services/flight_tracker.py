@@ -207,6 +207,7 @@ class FlightTrackerService:
         scraper: GoogleFlightsScraper | None = None,
         weeks_ahead: int = 8,
         price_store_path: Path | None = None,
+        settings: "object | None" = None,
     ) -> None:
         """Initialize the flight tracker service.
 
@@ -218,6 +219,7 @@ class FlightTrackerService:
             scraper: GoogleFlightsScraper instance (optional).
             weeks_ahead: Number of weeks to check ahead.
             price_store_path: Path to YAML price store (optional).
+            settings: Settings instance for env var overrides (optional).
         """
         self._routes_config_path = routes_config_path
         self._holidays_config_path = holidays_config_path
@@ -225,6 +227,7 @@ class FlightTrackerService:
         self._notifier = notifier
         self._scraper = scraper
         self._weeks_ahead = weeks_ahead
+        self._settings = settings
 
         self._routes: RoutesConfig | None = None
         self._date_calculator: FlightDateCalculator | None = None
@@ -233,9 +236,11 @@ class FlightTrackerService:
         self._price_store = FlightPriceStore(path=price_store_path)
 
     def _load_routes(self) -> RoutesConfig:
-        """Load routes configuration."""
+        """Load routes configuration, applying env var overrides from settings."""
         if self._routes is None:
-            self._routes = RoutesConfig.from_yaml(self._routes_config_path)
+            from aventure_tracker.config import Settings
+            settings = self._settings if hasattr(self, "_settings") else None
+            self._routes = RoutesConfig.from_yaml(self._routes_config_path, settings=settings)
             logger.info(f"Loaded {len(self._routes.routes)} routes")
             policy = self._routes.airline_policy
             logger.info(
@@ -243,6 +248,8 @@ class FlightTrackerService:
                 f"bargain_threshold=${policy.bargain_threshold:,}, "
                 f"extra_rules={len(policy.extra_airlines)}"
             )
+            for route in self._routes.routes:
+                logger.info(f"  {route}: price_threshold=${route.price_threshold:,}")
         return self._routes
 
     def _get_date_calculator(self) -> FlightDateCalculator:

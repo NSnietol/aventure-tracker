@@ -181,6 +181,7 @@ class AdventureOrchestrator:
                 state_manager=self._state_manager,
                 notifier=None,
                 weeks_ahead=self._weeks_ahead,
+                settings=self._settings,
             )
             self._logger.info("Flight tracker initialized")
 

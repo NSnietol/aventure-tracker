@@ -3,13 +3,16 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
-
 from enum import Enum
 from typing import Literal
+
+if TYPE_CHECKING:
+    from aventure_tracker.config import Settings
 
 
 class SearchDay(str, Enum):
@@ -175,11 +178,17 @@ class RoutesConfig(BaseModel):
     airline_policy: AirlinePolicy = Field(default_factory=AirlinePolicy.default)
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "RoutesConfig":
+    def from_yaml(cls, path: Path, settings: "Settings | None" = None) -> "RoutesConfig":
         """Load routes configuration from a YAML file.
+
+        If settings are provided, env var overrides take precedence:
+        - settings.flight_price_threshold → overrides price_threshold on all routes
+        - settings.flight_bargain_threshold → overrides airline_policy.bargain_threshold
+        - settings.flight_extra_max_price → overrides max_price on all extra_airlines rules
 
         Args:
             path: Path to the YAML configuration file.
+            settings: Optional Settings instance for env var overrides.
 
         Returns:
             RoutesConfig instance with loaded routes.
@@ -194,7 +203,22 @@ class RoutesConfig(BaseModel):
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        return cls.model_validate(data or {"routes": []})
+        config = cls.model_validate(data or {"routes": []})
+
+        # Apply env var overrides if settings provided
+        if settings is not None:
+            if settings.flight_price_threshold is not None:
+                for route in config.routes:
+                    route.price_threshold = settings.flight_price_threshold
+
+            if settings.flight_bargain_threshold is not None:
+                config.airline_policy.bargain_threshold = settings.flight_bargain_threshold
+
+            if settings.flight_extra_max_price is not None:
+                for rule in config.airline_policy.extra_airlines:
+                    rule.max_price = settings.flight_extra_max_price
+
+        return config
 
 
 @dataclass

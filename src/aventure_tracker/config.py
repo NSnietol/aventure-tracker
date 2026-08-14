@@ -45,6 +45,20 @@ class Settings(BaseSettings):
         description="Recipient email address for notifications",
     )
 
+    # Flight threshold overrides (optional — override routes.yaml values)
+    flight_price_threshold: int | None = Field(
+        default=None,
+        description="Override price_threshold for all routes (COP). If set, takes precedence over routes.yaml.",
+    )
+    flight_bargain_threshold: int | None = Field(
+        default=None,
+        description="Override bargain_threshold in airline policy (COP). Any airline included if price ≤ this.",
+    )
+    flight_extra_max_price: int | None = Field(
+        default=None,
+        description="Override max_price for all extra_airlines rules (COP).",
+    )
+
     # GitHub Gist configuration
     gist_id: str = Field(
         default="",
