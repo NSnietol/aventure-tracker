@@ -35,6 +35,16 @@ class Settings(BaseSettings):
         description="Telegram chat ID for notifications",
     )
 
+    # Email configuration (Resend)
+    resend_api_key: str = Field(
+        default="",
+        description="Resend API key for email notifications",
+    )
+    email_to: str = Field(
+        default="",
+        description="Recipient email address for notifications",
+    )
+
     # GitHub Gist configuration
     gist_id: str = Field(
         default="",

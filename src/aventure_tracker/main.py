@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 
 from aventure_tracker.config import Settings
+from aventure_tracker.infrastructure.email_notifier import EmailNotifier
 from aventure_tracker.infrastructure.notifier import TelegramNotifier
 from aventure_tracker.infrastructure.state_manager import StateManager
 from aventure_tracker.services.activity_tracker import (
@@ -103,6 +104,7 @@ class AdventureOrchestrator:
 
         self._state_manager: StateManager | None = None
         self._notifier: TelegramNotifier | None = None
+        self._email_notifier: EmailNotifier | None = None
         self._flight_tracker: FlightTrackerService | None = None
         self._activity_tracker: ActivityTrackerService | None = None
         self._calendar_display: FlightCalendarDisplay | None = None
@@ -149,6 +151,15 @@ class AdventureOrchestrator:
                     chat_id=self._settings.telegram_chat_id,
                 )
                 self._logger.info("Telegram notifier initialized")
+
+        # Email notifier via Resend (if configured)
+        if self._settings.resend_api_key and self._settings.email_to:
+            if "your_" not in self._settings.resend_api_key.lower():
+                self._email_notifier = EmailNotifier(
+                    api_key=self._settings.resend_api_key,
+                    to_email=self._settings.email_to,
+                )
+                self._logger.info(f"Email notifier initialized → {self._settings.email_to}")
 
     def _init_trackers(self) -> None:
         """Initialize tracker services."""
@@ -370,7 +381,13 @@ class AdventureOrchestrator:
                 return_flights=return_flights,
                 weekend_matches=weekend_matches,
             )
-        else:
+        if self._email_notifier:
+            self._email_notifier.send_weekend_report(
+                outbound_flights=outbound,
+                return_flights=return_flights,
+                weekend_matches=weekend_matches,
+            )
+        if not self._notifier and not self._email_notifier:
             # Log to console when no notifier configured
             self._logger.info("=== WEEKEND REPORT (no notifier) ===")
             if outbound:
