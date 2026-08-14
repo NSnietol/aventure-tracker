@@ -497,10 +497,18 @@ class AdventureOrchestrator:
                 f"{'[sunday adventure→monday]' if p.sunday_adventure else ''}"
             )
 
+        # Only notify if at least one weekend has events — no point alerting without plans
+        pairs_with_events = [p for p in pairs if p.events]
+        if not pairs_with_events:
+            self._logger.info(
+                "No events found for any cheap weekend — skipping notification"
+            )
+            return
+
         # Console fallback when no email notifier
         if not self._email_notifier:
             self._logger.info("=== WEEKEND REPORT (no notifier) ===")
-            for p in pairs:
+            for p in pairs_with_events:
                 self._logger.info(f"Finde {p.date_label}{'  ⚠ sunday→monday' if p.sunday_adventure else ''}:")
                 self._logger.info(f"  Ida:    {p.outbound.travel_date} {p.outbound.departure_time} {p.outbound.airline} ${p.outbound.price:,}")
                 for i, ro in enumerate(p.return_options):
@@ -512,7 +520,7 @@ class AdventureOrchestrator:
             return
 
         if self._email_notifier:
-            self._email_notifier.send_weekend_report(pairs=pairs)
+            self._email_notifier.send_weekend_report(pairs=pairs_with_events)
 
     # ---------------------------------------------------------------------------
     # Helpers
