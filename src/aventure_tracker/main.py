@@ -406,20 +406,20 @@ class AdventureOrchestrator:
     ) -> None:
         """Build and send a consolidated weekend report, segmented by weekend.
 
-        Groups cheap flights into weekend windows (Thu→Mon), pairs each
-        outbound flight with the matching return flight for that week,
-        matches agency events, and sends ONE email with one section per weekend.
+        For each cheap outbound flight found:
+        - Groups matching return flights for that same weekend window
+        - Applies Sunday-adventure → Monday-return rule
+        - Applies LATAM-preference rule (keep LATAM unless another is ≥100K cheaper)
+        - Shows top 3 return options
+        - Matches agency events for that window
 
         Args:
             flights_result: Result from flight tracker with price_alerts.
         """
-        from aventure_tracker.services.flight_tracker import FlightFound
-        from datetime import timedelta
+        from aventure_tracker.services.flight_tracker import FlightFound, WeekendPair, ReturnOption
 
         alerts = flights_result.price_alerts
-        self._logger.info(
-            f"Building consolidated report for {len(alerts)} cheap flight(s)"
-        )
+        self._logger.info(f"Building consolidated report for {len(alerts)} cheap flight(s)")
 
         # Separate by direction
         outbound_all: list[FlightFound] = []
@@ -435,52 +435,38 @@ class AdventureOrchestrator:
         return_all.sort(key=lambda x: (x.travel_date, x.departure_time))
 
         # Match events from extraction cache
-        all_cheap_dates = [f.travel_date for f in outbound_all + return_all]
+        all_dates = [f.travel_date for f in outbound_all + return_all]
         matcher = EventMatcher(destinations_path=self._settings.get_destinations_path())
         matcher.load()
-        weekend_matches = matcher.find_events_for_dates(all_cheap_dates)
+        weekend_matches = matcher.find_events_for_dates(all_dates)
 
-        # Build weekend segments: group outbound+return+events by week window
-        # Each window is window_start → window_start+4 days
-        weekends: list[dict] = []
-        for match in weekend_matches:
-            ws = match.window_start
-            we = match.window_end
-            # Outbound flights that fall in this window
-            ida = [f for f in outbound_all if ws <= f.travel_date <= we]
-            # Return flights that fall in this window
-            vuelta = [f for f in return_all if ws <= f.travel_date <= we]
-            if not ida and not vuelta:
-                continue
-            weekends.append({
-                "window_start": ws,
-                "window_end": we,
-                "outbound": ida,
-                "returns": vuelta,
-                "events": match.events,
-            })
+        # Build WeekendPair list
+        pairs = self._build_weekend_pairs(outbound_all, return_all, weekend_matches)
 
-        total_events = sum(len(w["events"]) for w in weekends)
-        self._logger.info(
-            f"Found {total_events} events across {len(weekends)} weekend(s)"
-        )
+        self._logger.info(f"Built {len(pairs)} weekend pair(s)")
+        for p in pairs:
+            ret = p.recommended_return
+            ret_str = f"{ret.flight.travel_date} {ret.flight.airline} ${ret.flight.price:,}" if ret else "no return"
+            self._logger.info(
+                f"  {p.date_label}: {p.outbound.travel_date} {p.outbound.airline} "
+                f"${p.outbound.price:,} → {ret_str} "
+                f"{'[sunday adventure→monday]' if p.sunday_adventure else ''}"
+            )
 
-        # Log to console if no notifier
+        # Console fallback
         if not self._notifier and not self._email_notifier:
             self._logger.info("=== WEEKEND REPORT (no notifier) ===")
-            for w in weekends:
-                label = f"{w['window_start'].strftime('%d')}-{w['window_end'].strftime('%d %b %Y')}"
-                self._logger.info(f"Finde {label}:")
-                for f in w["outbound"]:
-                    self._logger.info(f"  Ida:    {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
-                for f in w["returns"]:
-                    self._logger.info(f"  Vuelta: {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
-                for ev in w["events"][:4]:
+            for p in pairs:
+                self._logger.info(f"Finde {p.date_label}{'  ⚠ sunday→monday' if p.sunday_adventure else ''}:")
+                self._logger.info(f"  Ida:    {p.outbound.travel_date} {p.outbound.departure_time} {p.outbound.airline} ${p.outbound.price:,}")
+                for i, ro in enumerate(p.return_options):
+                    tag = "✅ recomendado" if ro.is_recommended else f"alt {i}"
+                    self._logger.info(f"  Vuelta: {ro.flight.travel_date} {ro.flight.departure_time} {ro.flight.airline} ${ro.flight.price:,} [{tag}]")
+                for ev in p.events[:4]:
                     self._logger.info(f"  • {ev.name} ({ev.date_label}) {ev.price_formatted}")
             self._logger.info("===================================")
             return
 
-        # Send notifications
         if self._notifier:
             self._notifier.send_weekend_report(
                 outbound_flights=outbound_all,
@@ -488,7 +474,179 @@ class AdventureOrchestrator:
                 weekend_matches=weekend_matches,
             )
         if self._email_notifier:
-            self._email_notifier.send_weekend_report(weekends=weekends)
+            self._email_notifier.send_weekend_report(pairs=pairs)
+
+    # ---------------------------------------------------------------------------
+    # Helpers
+    # ---------------------------------------------------------------------------
+
+    @staticmethod
+    def _has_sunday_events(events: list, window_start: "date", window_end: "date") -> bool:
+        """Check if any events fall on Sunday within the weekend window.
+
+        If yes, return flights must be Monday (adventure runs all day Sunday).
+
+        Args:
+            events: List of MatchedEvent for this window.
+            window_start: First day of the window.
+            window_end: Last day of the window.
+
+        Returns:
+            True if any event starts or spans a Sunday in this window.
+        """
+        from datetime import timedelta
+        # Find all Sundays in the window
+        sundays = set()
+        current = window_start
+        while current <= window_end:
+            if current.weekday() == 6:  # Sunday
+                sundays.add(current)
+            current += timedelta(days=1)
+
+        if not sundays:
+            return False
+
+        for ev in events:
+            for sunday in sundays:
+                if ev.date_start <= sunday <= ev.date_end:
+                    return True
+        return False
+
+    def _build_weekend_pairs(
+        self,
+        outbound_all: list,
+        return_all: list,
+        weekend_matches: list,
+    ) -> list:
+        """Build WeekendPair list: one pair per cheap outbound flight.
+
+        Rules:
+        1. Sunday adventure → return must be Monday (filter out Sunday returns)
+        2. Saturday adventure → return can be Sunday 11AM+ or Monday
+        3. Priority airline outbound → prefer same for return unless
+           another airline is ≥100K cheaper
+        4. Show top 3 return options sorted by price
+        5. If no return found → still include pair (has_return=False)
+
+        Args:
+            outbound_all: All cheap outbound flights sorted by date.
+            return_all: All tracked return flights sorted by date.
+            weekend_matches: WeekendMatch objects with events per window.
+
+        Returns:
+            List of WeekendPair.
+        """
+        from aventure_tracker.services.flight_tracker import WeekendPair, ReturnOption
+        from datetime import timedelta
+
+        # Build a quick lookup: window_start → WeekendMatch
+        match_by_window: dict = {}
+        for m in weekend_matches:
+            match_by_window[m.window_start] = m
+
+        # Return flights indexed by date for fast lookup
+        returns_by_date: dict = {}
+        for f in return_all:
+            returns_by_date.setdefault(f.travel_date, []).append(f)
+
+        pairs = []
+
+        for outbound in outbound_all:
+            # Find which window this outbound belongs to
+            window_start = outbound.travel_date
+            # Adjust: if it's a Thursday, window_start = thursday
+            # window covers thu→mon (+4 days)
+            window_end = window_start + timedelta(days=4)
+
+            # Get events for this window
+            match = match_by_window.get(window_start)
+            events = match.events if match else []
+
+            # Detect Sunday adventure
+            sunday_adv = self._has_sunday_events(events, window_start, window_end)
+
+            # Collect candidate return flights within this window
+            candidates = []
+            current = window_start
+            while current <= window_end:
+                day_flights = returns_by_date.get(current, [])
+                for f in day_flights:
+                    # Sunday adventure → only Monday returns
+                    if sunday_adv and f.travel_date.weekday() == 6:  # 6=Sunday
+                        self._logger.debug(
+                            f"  Skipping Sunday return {f.travel_date} {f.airline} "
+                            f"${f.price:,} (sunday adventure active)"
+                        )
+                        continue
+                    # Saturday plan only → allow Sunday 11AM+
+                    if not sunday_adv and f.travel_date.weekday() == 6:
+                        try:
+                            h, m = map(int, f.departure_time.split(":"))
+                            from datetime import time as dtime
+                            if dtime(h, m) < dtime(11, 0):
+                                continue  # Too early Sunday
+                        except Exception:
+                            pass
+                    candidates.append(f)
+                current += timedelta(days=1)
+
+            # Sort candidates by price
+            candidates.sort(key=lambda f: f.price)
+
+            # Apply LATAM preference rule:
+            # If outbound is priority → keep priority return unless another is ≥100K cheaper
+            priority_returns = [f for f in candidates if f.is_priority]
+            non_priority_returns = [f for f in candidates if not f.is_priority]
+
+            ordered: list = []
+            if outbound.is_priority and priority_returns:
+                best_priority = priority_returns[0]
+                # Check if any non-priority is ≥100K cheaper
+                significant_saving = 100_000
+                better_non_priority = [
+                    f for f in non_priority_returns
+                    if best_priority.price - f.price >= significant_saving
+                ]
+                if better_non_priority:
+                    # Non-priority wins — put it first
+                    ordered = better_non_priority + [best_priority] + [
+                        f for f in non_priority_returns if f not in better_non_priority
+                    ]
+                else:
+                    # Priority wins
+                    ordered = [best_priority] + non_priority_returns
+            else:
+                ordered = candidates  # Already sorted by price
+
+            # Deduplicate by flight_id, keep top 3
+            seen_ids: set[str] = set()
+            top3: list = []
+            for f in ordered:
+                if f.flight_id not in seen_ids and len(top3) < 3:
+                    top3.append(f)
+                    seen_ids.add(f.flight_id)
+
+            # Build ReturnOption list
+            return_options: list[ReturnOption] = []
+            priority_price = next((f.price for f in top3 if f.is_priority), None)
+            for i, f in enumerate(top3):
+                savings = (priority_price - f.price) if priority_price and not f.is_priority else None
+                return_options.append(ReturnOption(
+                    flight=f,
+                    is_recommended=(i == 0),
+                    savings_vs_priority=savings,
+                ))
+
+            pairs.append(WeekendPair(
+                window_start=window_start,
+                window_end=window_end,
+                outbound=outbound,
+                return_options=return_options,
+                events=events,
+                sunday_adventure=sunday_adv,
+            ))
+
+        return pairs
 
     def _show_flight_calendar(
         self,

@@ -55,6 +55,81 @@ class FlightFound:
 
 
 @dataclass
+class ReturnOption:
+    """A return flight option for a weekend pair.
+
+    Attributes:
+        flight: The return flight.
+        is_recommended: Whether this is the recommended option.
+            True for the best match given outbound airline and price rules.
+        savings_vs_priority: COP saved vs the priority airline return (if any).
+            Negative means this option is more expensive than priority.
+    """
+
+    flight: FlightFound
+    is_recommended: bool = False
+    savings_vs_priority: int | None = None
+
+
+@dataclass
+class WeekendPair:
+    """Outbound flight paired with return options for a specific weekend.
+
+    Rules applied:
+    - If events fall on Sunday → return must be Monday (not Sunday)
+    - If outbound is priority airline → prefer same for return unless
+      another airline is ≥100K cheaper
+    - Always expose top 3 return options sorted by price
+
+    Attributes:
+        window_start: First day of the weekend window (Thursday).
+        window_end: Last day of the window (Monday).
+        outbound: The cheap outbound flight that triggered the alert.
+        return_options: Up to 3 return flight options, sorted by price.
+            First entry is the recommended one (is_recommended=True).
+        events: Agency events available this weekend.
+        sunday_adventure: Whether events fall on Sunday (forces Monday return).
+    """
+
+    window_start: date
+    window_end: date
+    outbound: FlightFound
+    return_options: list[ReturnOption]
+    events: list  # list[MatchedEvent] — imported at runtime to avoid circular
+    sunday_adventure: bool = False
+
+    @property
+    def recommended_return(self) -> ReturnOption | None:
+        """The recommended return option (first in list)."""
+        return self.return_options[0] if self.return_options else None
+
+    @property
+    def alternative_returns(self) -> list[ReturnOption]:
+        """Non-recommended return options (2nd and 3rd)."""
+        return self.return_options[1:]
+
+    @property
+    def total_price(self) -> int | None:
+        """Total price for outbound + recommended return."""
+        if self.recommended_return:
+            return self.outbound.price + self.recommended_return.flight.price
+        return None
+
+    @property
+    def has_return(self) -> bool:
+        """Whether at least one return option was found."""
+        return len(self.return_options) > 0
+
+    @property
+    def date_label(self) -> str:
+        """Human readable window label."""
+        return (
+            f"{self.window_start.strftime('%d')}-"
+            f"{self.window_end.strftime('%d %b %Y')}"
+        )
+
+
+@dataclass
 class PriceAlert:
     """Price alert for a flight.
 
