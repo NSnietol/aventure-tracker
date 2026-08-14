@@ -234,9 +234,10 @@ class AdventureOrchestrator:
                     errors.extend(flights_result.errors)
 
                     # If cheap flights found, run event extraction + send consolidated report
-                    if flights_result.price_alerts and self._notifier:
+                    if flights_result.price_alerts:
                         await self._send_consolidated_report(flights_result)
-                        flights_result.notifications_sent = 1
+                        if self._notifier:
+                            flights_result.notifications_sent = 1
 
                 except Exception as e:
                     error = f"Flight tracker failed: {e}"
@@ -369,6 +370,23 @@ class AdventureOrchestrator:
                 return_flights=return_flights,
                 weekend_matches=weekend_matches,
             )
+        else:
+            # Log to console when no notifier configured
+            self._logger.info("=== WEEKEND REPORT (no notifier) ===")
+            if outbound:
+                self._logger.info("Ida (BAQ→MDE):")
+                for f in outbound:
+                    self._logger.info(f"  {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
+            if return_flights:
+                self._logger.info("Vuelta (MDE→BAQ):")
+                for f in return_flights:
+                    self._logger.info(f"  {f.travel_date} {f.departure_time} {f.airline} ${f.price:,}")
+            for match in weekend_matches:
+                if match.has_events:
+                    self._logger.info(f"Planes {match.date_label}:")
+                    for ev in match.events[:5]:
+                        self._logger.info(f"  • {ev.name} ({ev.date_label}) {ev.price_formatted}")
+            self._logger.info("===================================")
 
     def _show_flight_calendar(
         self,
