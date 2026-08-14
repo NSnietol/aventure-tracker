@@ -388,10 +388,6 @@ class FlightTrackerService:
 
                             # Check airline policy
                             if not self._should_track_flight(flight, route):
-                                logger.debug(
-                                    f"    Skipping {flight.airline} ${flight.price:,}: "
-                                    f"not priority and price > {NON_PRIORITY_PRICE_THRESHOLD:,}"
-                                )
                                 continue
 
                             # Create unique flight ID
