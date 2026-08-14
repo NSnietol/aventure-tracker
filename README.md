@@ -2,6 +2,49 @@
 
 Sistema local para rastrear vuelos baratos y cruzarlos con eventos de agencias de aventura, enviando una notificación consolidada por email cuando hay un finde que vale la pena.
 
+## ¿Cómo funciona?
+
+Monitorea vuelos baratos entre Barranquilla y Medellín. Cuando encuentra uno por debajo del precio que defines, busca qué planes de aventura hay disponibles ese fin de semana (según las agencias que sigues) y manda un solo email con todo: vuelo + actividades. Sin hacer nada manual.
+
+```
+inbox/brutal/        inbox/medellin-bungee/
+  (imágenes JPG/PNG de calendarios de agencias)
+          ↓
+    Gemini Vision API
+    "¿Qué eventos hay en esta imagen?"
+          ↓
+    extraction_cache.yaml
+    { "Canyoning San Carlos": "23 Ago, $180K" }
+          ↓                        ↓
+  Google Flights              EventMatcher
+  (Playwright scraping)       cruza fechas baratas
+  BAQ→MDE $358K               con eventos disponibles
+  MDE→BAQ $291K ✅            filtra blacklist
+          ↓                        ↓
+              Resend API
+         Email HTML con vuelo + planes ese finde
+```
+
+## Stack
+
+| Tecnología | Rol |
+|-----------|-----|
+| **Python 3.12** | Lenguaje base. `asyncio` para operaciones I/O-bound |
+| **Playwright** | Controla Chromium headless para scrapear Google Flights. Google Flights es una SPA sin API pública — la única forma de leer precios es renderizar la página completa |
+| **Gemini Vision API** | Modelo multimodal que analiza imágenes de calendarios de agencias y extrae eventos estructurados (nombre, fecha, precio). Alternativa offline: Ollama + minicpm-v |
+| **Resend** | API de email transaccional. Se eligió sobre Gmail SMTP para no exponer credenciales personales — solo un API key revocable |
+| **Pydantic** | Validación de configuración y lectura de variables de entorno desde `.env` |
+| **YAML** | Almacenamiento local: historial de precios, cache de extracción, configuración. Sin base de datos — todo versionable con git |
+| **SHA256 hashing** | Cache de imágenes basado en contenido. Si mandas la misma imagen con distinto nombre, no se reprocesa |
+| **pytest** | 720 tests unitarios e integración. Scrapers mockeados con `AsyncMock` para no hacer requests reales |
+
+### Decisiones de diseño
+
+- **Sin base de datos** — YAML es suficiente. Todo es legible, versionable y sin setup.
+- **Sin servidor** — corre como script local o en CI (GitHub Actions). No hay proceso siempre activo.
+- **Blacklist en vez de whitelist** — ves todo lo que ofrecen las agencias *excepto* lo que ya visitaste o no te interesa. Más fácil de mantener.
+- **Un solo email** — espera a tener el cuadro completo (vuelo ida + vuelta + eventos) y manda uno. Menos ruido.
+
 ## Features
 
 - **Flight Tracking**: Monitorea precios en Google Flights para viajes de fin de semana
