@@ -185,4 +185,6 @@ docs/
 # Ignore activity history (personal tracking state)
 data/activity_history.yaml
 
-# Track flight_prices.yaml and agencies/ (important data)
+# Runtime data files (generated on each run, not tracked)
+data/flight_prices.yaml
+data/extraction_cache.yaml
