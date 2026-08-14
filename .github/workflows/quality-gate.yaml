@@ -3,11 +3,9 @@ name: Quality Gate
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
 
 concurrency:
-  group: quality-gate-${{ github.ref }}
+  group: quality-gate-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
