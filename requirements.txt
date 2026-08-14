@@ -9,6 +9,6 @@ instaloader>=4.10.0,<5.0.0
 pytesseract>=0.3.10,<1.0.0
 Pillow>=11.0.0,<13.0.0
 holidays>=0.50,<1.0.0
-setuptools>=70.0.0
+setuptools>=84.0.0
 google-genai>=1.0.0,<3.0.0
 resend>=2.0.0,<3.0.0
