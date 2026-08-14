@@ -1,284 +1,234 @@
 # Adventure Tracker
 
-Sistema local y offline para rastrear vuelos baratos y extraer eventos de calendarios de agencias de viajes, sin dependencias de APIs externas de pago.
+Sistema local para rastrear vuelos baratos y cruzarlos con eventos de agencias de aventura, enviando una notificación consolidada por email cuando hay un finde que vale la pena.
 
 ## Features
 
-- **Flight Tracking**: Monitoreo de precios en Google Flights para viajes de fin de semana
-  - Rutas: BAQ↔MDE, CTG↔MDE (ida y vuelta)
+- **Flight Tracking**: Monitorea precios en Google Flights para viajes de fin de semana
+  - Rutas: BAQ↔MDE (ida y vuelta)
   - Busca jueves/viernes (ida) y domingo/lunes (vuelta)
-  - 10 semanas de anticipación (hasta ~2.5 meses)
-  - Alertas cuando precio ≤ umbral ($150,000 COP por trayecto)
+  - Hasta 10 semanas de anticipación
+  - Alerta cuando precio ≤ umbral configurado en `config/routes.yaml`
 
-- **Calendar Event Extraction**: Extracción de eventos de imágenes de calendarios
-  - Procesamiento con Gemini API (rápido, ~3s/imagen) u Ollama + minicpm-v (100% local)
-  - Cache basado en contenido (SHA256) para evitar reprocesar imágenes
-  - Soporte para múltiples agencias de viajes
-  - Detección de fechas, precios y destinos
+- **Event Extraction**: Extrae eventos de imágenes de calendarios de agencias
+  - Procesa con Gemini API (~3s/imagen) u Ollama local (~9s/imagen)
+  - Cache SHA256 para no reprocesar imágenes ya vistas
+  - Agencias: `inbox/brutal/`, `inbox/medellin-bungee/`
 
-- **Local Storage**: Todo se guarda localmente
-  - Precios de vuelos: `data/flight_prices.yaml`
-  - Eventos extraídos: `data/events.yaml`
-  - Cache de extracción: `data/extraction_cache.yaml`
-  - Sin necesidad de GitHub Gist ni APIs externas
-
-- **Colombian Holidays**: Soporte para puentes (fines de semana largos)
+- **Reporte Consolidado**: Cuando hay vuelo barato, cruza con eventos disponibles ese finde y envía **un solo email** con todo
+  - Template HTML estilo revista de aventuras
+  - Filtra destinos ya visitados (`config/destinations.yaml`)
+  - Enviado vía Resend (gratis, sin exponer credenciales personales)
 
 ## Quick Start
 
-### Prerequisites
+### Requisitos
 
 - Python 3.12+
-- [Ollama](https://ollama.ai/) con modelo `minicpm-v` (opcional, para extracción offline)
-- Gemini API key (opcional, para extracción rápida)
-- Playwright browsers
+- Playwright (browser headless)
+- Resend API key (gratis en [resend.com](https://resend.com))
+- Gemini API key (opcional, gratis en [aistudio.google.com](https://aistudio.google.com/apikey))
 
-### Installation
+### Instalación
 
 ```bash
-# Clone repository
 git clone https://github.com/yourusername/aventure-tracker.git
 cd aventure-tracker
 
-# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
 pip install -e ".[dev]"
-
-# Install Playwright browsers
 playwright install chromium
-
-# Install Ollama (macOS)
-brew install ollama
-
-# Pull the vision model (optional, for offline extraction)
-ollama pull minicpm-v
-
-# Set Gemini API key (optional, for fast extraction)
-# Get key from https://aistudio.google.com/apikey
-echo "GEMINI_API_KEY=your_key_here" >> .env
 ```
 
-### Running
+### Configuración
+
+Copia `.env.example` a `.env` y completa:
 
 ```bash
-# Track flight prices (10 weeks, all routes)
+# Notificaciones por email (Resend)
+RESEND_API_KEY=re_tu_api_key
+EMAIL_TO=tu@email.com
+
+# Extracción de imágenes (opcional, más rápido que Ollama)
+GEMINI_API_KEY=tu_gemini_key
+```
+
+## Comandos
+
+### Rastrear vuelos (flujo completo)
+
+```bash
+# Busca vuelos baratos + cruza con eventos + envía email si hay alerta
+python src/aventure_tracker/main.py --mode flights
+
+# Con más semanas de anticipación
+python src/aventure_tracker/main.py --mode flights --weeks 4
+
+# Sin enviar notificaciones (solo ver resultados)
 python src/aventure_tracker/main.py --mode flights --dry-run
 
-# Extract events from agency calendars (uses Gemini if GEMINI_API_KEY set, else Ollama)
-python scripts/extract_events.py --source agent-calendars/brutal
-
-# Force reprocess (ignore cache)
-python scripts/extract_events.py --source agent-calendars/brutal --force
-
-# View cache statistics
-python scripts/extract_events.py --cache-stats
-
-# Clear cache and reprocess
-python scripts/extract_events.py --source agent-calendars/brutal --clear-cache
-
-# Run with fewer weeks
-python src/aventure_tracker/main.py --mode flights --weeks 4 --dry-run
+# Con logs detallados
+python src/aventure_tracker/main.py --mode flights --verbose
 ```
 
-## Configuration
-
-### Flight Routes (`config/routes.yaml`)
-
-```yaml
-routes:
-  # Outbound (Thursday/Friday)
-  - origin: BAQ
-    destination: MDE
-    price_threshold: 150000  # COP per leg
-    drop_percentage: 15
-  
-  - origin: CTG
-    destination: MDE
-    price_threshold: 150000
-    drop_percentage: 15
-
-  # Return (Sunday/Monday)
-  - origin: MDE
-    destination: BAQ
-    price_threshold: 150000
-    drop_percentage: 15
-
-  - origin: MDE
-    destination: CTG
-    price_threshold: 150000
-    drop_percentage: 15
-```
-
-### Holidays (`config/holidays.yaml`)
-
-```yaml
-holidays:
-  2026:
-    - date: "2026-01-06"
-      name: "Reyes Magos"
-    - date: "2026-03-23"
-      name: "San José"
-    # ... más festivos
-```
-
-## Flight Data
-
-Los precios se guardan en `data/flight_prices.yaml`:
-
-```yaml
-# All prices are ONE-WAY (solo ida)
-# Currency: COP (Colombian Pesos)
-
-updated_at: '2026-08-12T10:56:08'
-routes:
-  BAQ-MDE_2026-08-27:
-    route: BAQ-MDE
-    travel_date: '2026-08-27'
-    records:
-    - price: 175691
-      checked_at: '2026-08-12T10:38:41'
-```
-
-### Search Pattern
-
-| Día | Dirección | Propósito |
-|-----|-----------|-----------|
-| Jueves | →MDE | Salida tarde (6pm+) |
-| Viernes | →MDE | Salida temprano |
-| Domingo | MDE→ | Regreso tarde (2pm+) |
-| Lunes | MDE→ | Regreso temprano (antes 10am) |
-
-## Calendar Event Extraction
-
-### Setup Agency Images
-
-```
-agent-calendars/
-└── brutal/           # Agencia "Brutal Adventures"
-    ├── agosto.png
-    ├── septiembre.png
-    └── octubre.png
-```
-
-### Run Extraction
+### Extraer eventos de agencias
 
 ```bash
-# Extrae eventos (Gemini si hay API key, sino Ollama)
-python scripts/extract_events.py --source agent-calendars/brutal
+# Procesa imágenes nuevas en inbox/ (Gemini si hay API key, sino Ollama)
+python scripts/extract_events.py
+
+# Solo una agencia
+python scripts/extract_events.py --agency brutal
 
 # Forzar reprocesamiento (ignora cache)
-python scripts/extract_events.py --source agent-calendars/brutal --force
+python scripts/extract_events.py --force
+
+# Ver estadísticas del cache
+python scripts/extract_events.py --cache-stats
 ```
 
-El script:
-1. Verifica cache de imágenes ya procesadas (SHA256 hash)
-2. Si usa Gemini: envía imágenes nuevas a la API (~3s/imagen)
-3. Si usa Ollama: verifica servidor y modelo `minicpm-v` (~9s/imagen)
-4. Procesa cada imagen y extrae eventos
-5. Guarda resultados en `data/events.yaml` y actualiza cache
+### Otros modos
 
-## Architecture
+```bash
+# Ver solo actividades de Instagram (sin vuelos)
+python src/aventure_tracker/main.py --mode activities
+
+# Mostrar calendario de vuelos
+python src/aventure_tracker/main.py --mode calendar
+
+# Ejecutar todo (vuelos + actividades)
+python src/aventure_tracker/main.py --mode all
+```
+
+## Flujo completo
+
+```
+1. python scripts/extract_events.py
+        ↓
+   Lee inbox/brutal/ + inbox/medellin-bungee/
+   Extrae eventos con Gemini → guarda en data/extraction_cache.yaml
+
+2. python src/aventure_tracker/main.py --mode flights
+        ↓
+   Busca vuelos baratos en Google Flights (próximos weekends)
+        ↓
+   Si encuentra precio ≤ threshold:
+     Cruza fechas con eventos del cache
+     Filtra blacklist (destinations.yaml)
+     Envía UN email consolidado con vuelos + eventos
+```
+
+## Configuración
+
+### Rutas de vuelos (`config/routes.yaml`)
+
+```yaml
+routes:
+  - origin: BAQ
+    destination: MDE
+    price_threshold: 300000  # COP ida sencilla
+    drop_percentage: 15
+    search_days: [thursday, friday]
+
+  - origin: MDE
+    destination: BAQ
+    price_threshold: 300000
+    drop_percentage: 15
+    search_days: [sunday, monday]
+```
+
+### Filtros de tiempo por día
+
+| Día | Ventana | Propósito |
+|-----|---------|-----------|
+| Jueves | 18:00 – 23:59 | Salida después del trabajo |
+| Viernes | 00:00 – 16:00 | Salida temprano |
+| Domingo | 14:00 – 23:59 | Regreso tarde |
+| Lunes | 00:00 – 10:00 | Regreso muy temprano |
+
+### Blacklist de destinos (`config/destinations.yaml`)
+
+```yaml
+blacklist:
+  ya_fue:
+    - Tatacoa
+    - Cerro Tusa
+  playa:
+    - Rincón del Mar
+  no_interesa:
+    - avistamiento de ballenas
+```
+
+### Imágenes de agencias (`inbox/`)
+
+```
+inbox/
+├── brutal/              # Brutal Travel
+│   ├── agosto.jpg
+│   └── septiembre.png
+└── medellin-bungee/     # Medellín Bungee
+    └── agosto.jpg
+```
+
+## Arquitectura
 
 ```
 aventure-tracker/
 ├── src/aventure_tracker/
-│   ├── main.py                 # CLI principal
-│   ├── models/
-│   │   ├── flight.py           # RouteConfig, WeekendTrip, FlightResult
-│   │   └── event.py            # ExtractedEvent
+│   ├── main.py                      # CLI + orquestador principal
+│   ├── config.py                    # Settings (env vars)
+│   ├── infrastructure/
+│   │   ├── email_notifier.py        # Resend — email HTML
+│   │   ├── notifier.py              # Telegram (opcional)
+│   │   └── state_manager.py         # Gist state (CI)
 │   ├── services/
-│   │   ├── flight_tracker.py   # Orquestador de vuelos
-│   │   ├── flight_dates.py     # Cálculo de fechas
-│   │   ├── flight_price_store.py # Persistencia YAML
-│   │   ├── holidays.py         # Festivos colombianos
-│   │   ├── image_event_extractor.py # Ollama vision
-│   │   ├── gemini_event_extractor.py # Gemini API vision
-│   │   └── extraction_cache.py # Cache de imágenes procesadas
+│   │   ├── flight_tracker.py        # Lógica de rastreo de vuelos
+│   │   ├── event_matcher.py         # Cruza vuelos baratos con eventos
+│   │   ├── flight_price_store.py    # Historial de precios YAML
+│   │   ├── flight_dates.py          # Cálculo de weekends
+│   │   ├── holidays.py              # Festivos colombianos
+│   │   ├── image_event_extractor.py # Gemini / Ollama vision
+│   │   └── extraction_cache.py      # Cache SHA256 de imágenes
 │   └── scrapers/
-│       └── google_flights/     # Scraper de Google Flights
+│       └── google_flights/          # Playwright scraper
 ├── scripts/
-│   └── extract_events.py       # Script de extracción
+│   └── extract_events.py            # CLI de extracción de eventos
 ├── config/
-│   ├── routes.yaml             # Rutas de vuelos
-│   └── holidays.yaml           # Festivos
+│   ├── routes.yaml                  # Rutas y thresholds
+│   ├── destinations.yaml            # Blacklist de destinos
+│   └── holidays.yaml                # Festivos colombianos
 ├── data/
-│   ├── flight_prices.yaml      # Historial de precios (tracked)
-│   ├── extraction_cache.yaml   # Cache de imágenes procesadas
-│   └── agencies/               # Eventos extraídos (tracked)
-└── agent-calendars/            # Imágenes de calendarios
+│   ├── flight_prices.yaml           # Historial de precios
+│   └── extraction_cache.yaml        # Cache de eventos extraídos
+├── inbox/                           # Imágenes de calendarios de agencias
+└── email-mockups/                   # Maquetas HTML del email
 ```
 
 ## Development
 
-### Running Tests
-
 ```bash
-# Activate venv
+# Tests
 source .venv/bin/activate
-
-# All tests
 pytest tests/ -v --tb=short
 
-# With coverage
+# Con coverage
 pytest tests/ --cov=src --cov-report=html
-```
 
-### Code Quality
-
-```bash
-# Linting
+# Linting / formatting
 ruff check src/ tests/
-
-# Formatting  
 ruff format src/ tests/
 ```
 
-## How It Works
+## Notificaciones
 
-### Flight Tracking Flow
+| Canal | Estado | Configuración |
+|-------|--------|---------------|
+| Email (Resend) | ✅ Activo | `RESEND_API_KEY` + `EMAIL_TO` en `.env` |
+| Telegram | Opcional | `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` en `.env` |
 
-1. `FlightDateCalculator` genera los próximos 10 weekends
-2. `HolidayService` identifica puentes
-3. Para cada ruta (4 rutas: ida/vuelta × BAQ/CTG):
-   - Rutas →MDE: busca jueves + viernes
-   - Rutas MDE→: busca domingo + lunes
-4. `GoogleFlightsScraper` obtiene precios de Google Flights
-5. `FlightPriceStore` guarda historial en YAML local
-6. Genera alertas si precio ≤ umbral
-
-### Event Extraction Flow
-
-1. `extract_events.py` carga cache de imágenes procesadas
-2. Filtra imágenes nuevas (no en cache, basado en SHA256 del contenido)
-3. Si `GEMINI_API_KEY` está configurado:
-   - Usa Gemini API (gemini-2.5-flash-lite, ~3s/imagen)
-4. Si no, usa Ollama:
-   - Valida servidor y modelo `minicpm-v`
-   - Procesa localmente (~9s/imagen)
-5. Para cada imagen nueva:
-   - Extrae eventos (fecha, destino, precio, descripción)
-   - Calcula confidence score
-   - Guarda en cache
-6. Guarda eventos en `data/events.yaml`
-
-## Offline Capabilities
-
-El sistema está diseñado para funcionar sin APIs externas de pago:
-
-| Componente | Solución Offline | Solución Online |
-|------------|------------------|-----------------|
-| Vision/OCR | Ollama + minicpm-v (local) | Gemini API (gratis, rate limited) |
-| Persistencia | YAML files (git tracked) | - |
-| Web scraping | Playwright (headless) | - |
-| Cache | SHA256 content hash (local) | - |
-
-Solo requiere conexión a internet para:
-- Scraping de Google Flights
-- Gemini API (si se usa en lugar de Ollama)
-- (Opcional) Telegram notifications
+Si ambos están configurados, se envían los dos.
 
 ## License
 
