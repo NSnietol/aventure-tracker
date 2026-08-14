@@ -28,7 +28,13 @@ airline_policy:
   priority_airlines:
     - LATAM             # Priority: beneficios/puntos. Include if ≤ route threshold.
   bargain_threshold: 110000   # Any airline at this price or below is always included.
-  extra_airlines: []    # Example: [{name: Wingo, max_price: 150000}]
+  extra_airlines:
+    - name: Wingo
+      max_price: 150000
+    - name: JetSMART
+      max_price: 150000
+    - name: Avianca
+      max_price: 150000
 
 routes:
   # === OUTBOUND (IDA) - Thursday/Friday ===
