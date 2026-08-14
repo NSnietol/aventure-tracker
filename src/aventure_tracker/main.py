@@ -7,6 +7,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from pathlib import Path
 
 from aventure_tracker.config import Settings
 from aventure_tracker.infrastructure.email_notifier import EmailNotifier
@@ -237,18 +238,26 @@ class AdventureOrchestrator:
             # Run flight tracker
             if self._flight_tracker and self._mode != RunMode.CALENDAR:
                 try:
-                    self._logger.info("Running flight tracker...")
+                    # Step 1: Process new inbox images → update extraction cache
+                    self._logger.info("Step 1/3: Processing inbox images...")
+                    self._run_inbox_extraction()
+
+                    # Step 2: Search for cheap flights
+                    self._logger.info("Step 2/3: Searching for cheap flights...")
                     flights_result = await self._flight_tracker.track_flights()
                     self._logger.info(
                         f"Flight tracking complete: {flights_result.alerts_generated} alerts"
                     )
                     errors.extend(flights_result.errors)
 
-                    # If cheap flights found, run event extraction + send consolidated report
+                    # Step 3: If cheap flights found, cross with events + send report
                     if flights_result.price_alerts:
+                        self._logger.info("Step 3/3: Building consolidated report...")
                         await self._send_consolidated_report(flights_result)
-                        if self._notifier:
+                        if self._notifier or self._email_notifier:
                             flights_result.notifications_sent = 1
+                    else:
+                        self._logger.info("Step 3/3: No cheap flights — no report sent")
 
                 except Exception as e:
                     error = f"Flight tracker failed: {e}"
@@ -325,6 +334,72 @@ class AdventureOrchestrator:
         )
 
         return result
+
+    def _run_inbox_extraction(self) -> None:
+        """Process new images from inbox/ and update extraction cache.
+
+        Runs the same logic as scripts/extract_events.py but inline,
+        skipping images already in cache (content-based deduplication).
+        """
+        import os
+        from aventure_tracker.services.image_event_extractor import (
+            ExtractionConfig,
+            ImageEventExtractor,
+            ModelProvider,
+        )
+        from aventure_tracker.services.extraction_cache import ExtractionCache
+        from aventure_tracker.services.file_organizer import detect_file_type
+
+        inbox_path = Path("inbox")
+        cache_path = Path("data/extraction_cache.yaml")
+
+        if not inbox_path.exists():
+            self._logger.info("No inbox/ directory found, skipping image extraction")
+            return
+
+        # Auto-detect provider
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        provider = ModelProvider.GEMINI if gemini_key else ModelProvider.OLLAMA
+
+        cache = ExtractionCache(cache_path)
+        config = ExtractionConfig(provider=provider)
+        extractor = ImageEventExtractor(config=config)
+
+        total_new = 0
+        total_events = 0
+
+        for agency_dir in sorted(inbox_path.iterdir()):
+            if not agency_dir.is_dir() or agency_dir.name.startswith("."):
+                continue
+            agency = agency_dir.name
+
+            for image_path in sorted(agency_dir.iterdir()):
+                if image_path.name.startswith("."):
+                    continue
+                if not detect_file_type(image_path):
+                    continue
+                if cache.is_processed(image_path):
+                    continue  # Already in cache, skip
+
+                self._logger.info(f"  Extracting: {agency}/{image_path.name}")
+                result = extractor.extract_from_image(image_path, agency)
+
+                if result.success:
+                    cache.add(result)
+                    total_new += 1
+                    total_events += len(result.events)
+                    self._logger.info(
+                        f"  → {len(result.events)} events extracted ({result.processing_time_ms}ms)"
+                    )
+                else:
+                    self._logger.warning(f"  → Failed: {result.error}")
+
+        if total_new > 0:
+            self._logger.info(
+                f"Inbox extraction complete: {total_new} new images, {total_events} events"
+            )
+        else:
+            self._logger.info("Inbox extraction: all images already cached")
 
     async def _send_consolidated_report(
         self, flights_result: FlightTrackerResult

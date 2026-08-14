@@ -57,26 +57,29 @@ GEMINI_API_KEY=tu_gemini_key
 
 ## Comandos
 
-### Rastrear vuelos (flujo completo)
+### Flujo completo (recomendado)
+
+Un solo comando hace todo:
+1. Procesa imágenes nuevas del `inbox/` (SHA256 — skip si ya está en cache)
+2. Busca vuelos baratos en Google Flights
+3. Cruza fechas con eventos de agencias
+4. Envía email si hay vuelo bajo el threshold
 
 ```bash
-# Busca vuelos baratos + cruza con eventos + envía email si hay alerta
-aventure-tracker --mode flights
-
-# Con más semanas de anticipación
-aventure-tracker --mode flights --weeks 4
-
-# Sin enviar notificaciones (solo ver resultados)
-aventure-tracker --mode flights --dry-run
+# Flujo completo con 2 semanas de anticipación
+python -m aventure_tracker.main --mode flights --weeks 2
 
 # Con logs detallados
-aventure-tracker --mode flights --verbose
+python -m aventure_tracker.main --mode flights --weeks 2 --verbose
+
+# Sin enviar notificaciones (ver resultados en consola)
+python -m aventure_tracker.main --mode flights --weeks 2 --dry-run
 ```
 
-### Extraer eventos de agencias
+### Extraer eventos manualmente
 
 ```bash
-# Procesa imágenes nuevas en inbox/ (Gemini si hay API key, sino Ollama)
+# Procesa imágenes nuevas en inbox/ (standalone)
 python scripts/extract_events.py
 
 # Solo una agencia
@@ -92,32 +95,28 @@ python scripts/extract_events.py --cache-stats
 ### Otros modos
 
 ```bash
-# Ver solo actividades de Instagram (sin vuelos)
-aventure-tracker --mode activities
-
 # Mostrar calendario de vuelos
-aventure-tracker --mode calendar
+python -m aventure_tracker.main --mode calendar
 
-# Ejecutar todo (vuelos + actividades)
-aventure-tracker
+# Ejecutar todo (vuelos + actividades Instagram)
+python -m aventure_tracker.main --mode all
 ```
 
 ## Flujo completo
 
 ```
-1. python scripts/extract_events.py
+python -m aventure_tracker.main --mode flights --weeks 2
         ↓
-   Lee inbox/brutal/ + inbox/medellin-bungee/
-   Extrae eventos con Gemini → guarda en data/extraction_cache.yaml
-
-2. aventure-tracker --mode flights
+1. Lee inbox/brutal/ + inbox/medellin-bungee/
+   Procesa solo imágenes nuevas (SHA256 → skip si ya en cache)
+   Extrae eventos con Gemini/Ollama → guarda en data/extraction_cache.yaml
         ↓
-   Busca vuelos baratos en Google Flights (próximos weekends)
+2. Busca vuelos baratos en Google Flights (próximos weekends)
         ↓
-   Si encuentra precio ≤ threshold:
-     Cruza fechas con eventos del cache
-     Filtra blacklist (destinations.yaml)
-     Envía UN email consolidado con vuelos + eventos
+3. Si precio ≤ threshold (config/routes.yaml):
+   Cruza fechas con eventos del cache
+   Filtra blacklist (config/destinations.yaml)
+   Envía UN email consolidado con vuelos + eventos
 ```
 
 ## Configuración
