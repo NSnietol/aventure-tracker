@@ -1,13 +1,18 @@
 """Flight tracker service for monitoring flight prices."""
 
 import logging
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, field
+from datetime import date, time
 from pathlib import Path
 
 from aventure_tracker.infrastructure.notifier import TelegramNotifier
 from aventure_tracker.infrastructure.state_manager import StateManager
-from aventure_tracker.models.flight import FlightResult, RouteConfig, RoutesConfig
+from aventure_tracker.models.flight import (
+    FlightResult,
+    RouteConfig,
+    RoutesConfig,
+    SearchDay,
+)
 from aventure_tracker.scrapers.google_flights import GoogleFlightsScraper
 from aventure_tracker.services.flight_dates import FlightDateCalculator
 from aventure_tracker.services.flight_price_store import FlightPriceStore
@@ -15,15 +20,55 @@ from aventure_tracker.services.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 
+# Airline priority configuration
+PRIORITY_AIRLINE = "LATAM"
+# Price threshold to consider non-priority airlines (in COP)
+NON_PRIORITY_PRICE_THRESHOLD = 120000
+
+# Time filters by day of week (based on requirements)
+# Thursday: after 6PM (18:00)
+# Friday: before 4PM (16:00)
+# Sunday: after 2PM (14:00)
+# Monday: before 10AM (10:00)
+TIME_FILTERS: dict[SearchDay, tuple[time, time]] = {
+    SearchDay.THURSDAY: (time(18, 0), time(23, 59)),  # 6PM - midnight
+    SearchDay.FRIDAY: (time(0, 0), time(16, 0)),  # midnight - 4PM
+    SearchDay.SATURDAY: (time(0, 0), time(23, 59)),  # all day
+    SearchDay.SUNDAY: (time(14, 0), time(23, 59)),  # 2PM - midnight
+    SearchDay.MONDAY: (time(0, 0), time(10, 0)),  # midnight - 10AM
+}
+
+
+@dataclass
+class FlightFound:
+    """A flight found during tracking.
+
+    Attributes:
+        flight_id: Unique identifier.
+        route: Route string (e.g., "BAQ→MDE").
+        travel_date: Date of travel.
+        departure_time: Departure time (HH:MM).
+        airline: Airline name.
+        price: Price in COP.
+        is_priority: Whether this is a priority airline flight.
+    """
+
+    flight_id: str
+    route: str
+    travel_date: date
+    departure_time: str
+    airline: str
+    price: int
+    is_priority: bool = False
+
 
 @dataclass
 class PriceAlert:
-    """Price alert for a flight route.
+    """Price alert for a flight.
 
     Attributes:
-        route: The flight route.
-        travel_date: Date of travel.
-        current_price: Current price found.
+        flight: The flight found.
+        route_config: The route configuration.
         previous_price: Previous price (if tracked).
         price_change: Change from previous price (negative = drop).
         price_change_pct: Percentage change.
@@ -31,9 +76,8 @@ class PriceAlert:
         is_significant_drop: Whether drop exceeds configured percentage.
     """
 
-    route: RouteConfig
-    travel_date: date
-    current_price: int
+    flight: FlightFound
+    route_config: RouteConfig
     previous_price: int | None
     price_change: int | None
     price_change_pct: float | None
@@ -47,38 +91,25 @@ class PriceAlert:
 
 
 @dataclass
-class PriceFound:
-    """A price found during a tracking run.
-
-    Attributes:
-        route: Route string (e.g., "BAQ→MDE").
-        travel_date: Date of travel.
-        price: Price in COP.
-    """
-
-    route: str
-    travel_date: date
-    price: int
-
-
-@dataclass
 class FlightTrackerResult:
     """Result of a flight tracking run.
 
     Attributes:
         routes_checked: Number of routes checked.
         dates_checked: Number of dates checked.
+        flights_found: Number of flights found.
         alerts_generated: Number of price alerts.
         notifications_sent: Number of notifications sent.
-        prices_found: List of prices found during this run.
+        prices_found: List of flights found during this run.
         errors: List of error messages.
     """
 
     routes_checked: int
     dates_checked: int
+    flights_found: int
     alerts_generated: int
     notifications_sent: int
-    prices_found: list[PriceFound]
+    prices_found: list[FlightFound]
     errors: list[str]
 
 
@@ -88,10 +119,9 @@ class FlightTrackerService:
     Orchestrates the flight scraping, price comparison, and notification
     process for configured routes and upcoming weekends.
 
-    Attributes:
-        routes_config_path: Path to routes.yaml configuration.
-        holidays_config_path: Path to holidays.yaml configuration.
-        weeks_ahead: Number of weeks to check for flights.
+    Filters flights by:
+    - Airline: LATAM has priority, others only if price <= 120,000 COP
+    - Time: Based on day of week (Thursday >= 6PM, Friday < 4PM, etc.)
     """
 
     def __init__(
@@ -150,6 +180,58 @@ class FlightTrackerService:
             self._scraper = GoogleFlightsScraper(headless=True)
         return self._scraper
 
+    def _is_valid_time_for_day(self, departure_time: str, search_day: SearchDay) -> bool:
+        """Check if departure time is valid for the search day.
+
+        Args:
+            departure_time: Time in HH:MM format.
+            search_day: The day being searched.
+
+        Returns:
+            True if time is within valid window for that day.
+        """
+        if not departure_time:
+            return True  # Accept if time not extracted
+
+        try:
+            hour, minute = map(int, departure_time.split(":"))
+            flight_time = time(hour, minute)
+        except (ValueError, AttributeError):
+            return True  # Accept if parsing fails
+
+        time_range = TIME_FILTERS.get(search_day)
+        if not time_range:
+            return True  # No filter for this day
+
+        min_time, max_time = time_range
+        return min_time <= flight_time <= max_time
+
+    def _should_track_flight(self, flight: FlightResult) -> bool:
+        """Determine if a flight should be tracked based on airline priority.
+
+        Priority rules:
+        - LATAM: Always track
+        - Other airlines: Only if price <= 120,000 COP
+
+        Args:
+            flight: The flight result.
+
+        Returns:
+            True if flight should be tracked.
+        """
+        airline_upper = flight.airline.upper()
+
+        # LATAM always has priority
+        if PRIORITY_AIRLINE in airline_upper:
+            return True
+
+        # Other airlines only if price is very low
+        return flight.price <= NON_PRIORITY_PRICE_THRESHOLD
+
+    def _is_priority_airline(self, airline: str) -> bool:
+        """Check if airline is the priority airline."""
+        return PRIORITY_AIRLINE in airline.upper()
+
     async def track_flights(self) -> FlightTrackerResult:
         """Run the flight tracking process.
 
@@ -168,6 +250,7 @@ class FlightTrackerService:
         result = FlightTrackerResult(
             routes_checked=0,
             dates_checked=0,
+            flights_found=0,
             alerts_generated=0,
             notifications_sent=0,
             prices_found=[],
@@ -180,41 +263,76 @@ class FlightTrackerService:
 
             for weekend in weekends:
                 # Get dates to check from route configuration
-                dates_to_check = [
-                    weekend.get_date_for_day(day) for day in route.search_days
-                ]
-
-                for travel_date in dates_to_check:
+                for search_day in route.search_days:
+                    travel_date = weekend.get_date_for_day(search_day)
                     result.dates_checked += 1
 
                     try:
-                        price = await scraper.get_cheapest_price(route, travel_date)
+                        # Use scrape() to get full flight details
+                        flights = await scraper.scrape(route, travel_date)
 
-                        if price is None:
-                            logger.info(f"  {route} {travel_date}: No price found")
+                        if not flights:
+                            logger.info(f"  {route} {travel_date} ({search_day.value}): No flights found")
                             continue
 
-                        # Log the price found
-                        logger.info(f"  {route} {travel_date}: ${price:,} COP")
+                        # Filter and process flights
+                        for flight in flights:
+                            # Check time filter
+                            departure_time_str = flight.departure_time.strftime("%H:%M")
+                            if not self._is_valid_time_for_day(departure_time_str, search_day):
+                                logger.debug(
+                                    f"    Skipping {flight.airline} {departure_time_str}: "
+                                    f"outside time window for {search_day.value}"
+                                )
+                                continue
 
-                        # Track price in result
-                        result.prices_found.append(
-                            PriceFound(
+                            # Check airline priority
+                            if not self._should_track_flight(flight):
+                                logger.debug(
+                                    f"    Skipping {flight.airline} ${flight.price:,}: "
+                                    f"not priority and price > {NON_PRIORITY_PRICE_THRESHOLD:,}"
+                                )
+                                continue
+
+                            # Create unique flight ID
+                            route_str = f"{route.origin}-{route.destination}"
+                            is_priority = self._is_priority_airline(flight.airline)
+
+                            flight_found = FlightFound(
+                                flight_id=f"{route_str}_{travel_date}_{departure_time_str}_{flight.airline}",
                                 route=str(route),
                                 travel_date=travel_date,
-                                price=price,
+                                departure_time=departure_time_str,
+                                airline=flight.airline,
+                                price=flight.price,
+                                is_priority=is_priority,
                             )
-                        )
 
-                        alert = self._create_alert(route, travel_date, price)
+                            # Log the flight
+                            priority_marker = "★" if is_priority else ""
+                            logger.info(
+                                f"  {route} {travel_date} {departure_time_str} "
+                                f"{flight.airline}{priority_marker}: ${flight.price:,} COP"
+                            )
 
-                        if alert.should_notify:
-                            result.alerts_generated += 1
-                            await self._send_notification(alert)
-                            result.notifications_sent += 1
+                            result.flights_found += 1
+                            result.prices_found.append(flight_found)
 
-                        # Update state
-                        self._update_price_state(route, travel_date, price)
+                            # Save to price store
+                            self._price_store.set_flight_price(
+                                route=route_str,
+                                travel_date=travel_date,
+                                departure_time=departure_time_str,
+                                airline=flight.airline,
+                                price=flight.price,
+                            )
+
+                            # Create alert and check if should notify
+                            alert = self._create_alert(flight_found, route)
+                            if alert.should_notify:
+                                result.alerts_generated += 1
+                                await self._send_notification(alert)
+                                result.notifications_sent += 1
 
                     except Exception as e:
                         error_msg = f"Error checking {route} on {travel_date}: {e}"
@@ -223,7 +341,8 @@ class FlightTrackerService:
 
         logger.info(
             f"Flight tracking complete: {result.routes_checked} routes, "
-            f"{result.dates_checked} dates, {result.alerts_generated} alerts"
+            f"{result.dates_checked} dates, {result.flights_found} flights, "
+            f"{result.alerts_generated} alerts"
         )
 
         # Save prices to local YAML store
@@ -232,74 +351,49 @@ class FlightTrackerService:
 
         return result
 
-    async def check_route(
-        self,
-        route: RouteConfig,
-        travel_date: date,
-    ) -> PriceAlert | None:
-        """Check a specific route and date for price alerts.
-
-        Args:
-            route: Route configuration.
-            travel_date: Date to check.
-
-        Returns:
-            PriceAlert if price found, None otherwise.
-        """
-        scraper = self._get_scraper()
-
-        try:
-            price = await scraper.get_cheapest_price(route, travel_date)
-
-            if price is None:
-                return None
-
-            alert = self._create_alert(route, travel_date, price)
-            self._update_price_state(route, travel_date, price)
-
-            return alert
-
-        except Exception as e:
-            logger.error(f"Error checking {route}: {e}")
-            return None
-
     def _create_alert(
         self,
-        route: RouteConfig,
-        travel_date: date,
-        current_price: int,
+        flight: FlightFound,
+        route_config: RouteConfig,
     ) -> PriceAlert:
-        """Create a price alert for a route.
+        """Create a price alert for a flight.
 
         Args:
-            route: Route configuration.
-            travel_date: Travel date.
-            current_price: Current price found.
+            flight: The flight found.
+            route_config: Route configuration.
 
         Returns:
             PriceAlert with comparison to previous price.
         """
-        previous_price = self._get_previous_price(route, travel_date)
+        # Get previous price for this specific flight
+        route_str = f"{route_config.origin}-{route_config.destination}"
+        flight_history = self._price_store.get_flight(
+            route=route_str,
+            travel_date=flight.travel_date,
+            departure_time=flight.departure_time,
+            airline=flight.airline,
+        )
+
+        previous_price = flight_history.previous_price if flight_history else None
 
         price_change: int | None = None
         price_change_pct: float | None = None
 
         if previous_price is not None:
-            price_change = current_price - previous_price
+            price_change = flight.price - previous_price
             if previous_price > 0:
                 price_change_pct = round((price_change / previous_price) * 100, 1)
 
-        is_below_threshold = current_price <= route.price_threshold
+        is_below_threshold = flight.price <= route_config.price_threshold
         is_significant_drop = (
             price_change_pct is not None
             and price_change_pct < 0
-            and abs(price_change_pct) >= route.drop_percentage
+            and abs(price_change_pct) >= route_config.drop_percentage
         )
 
         return PriceAlert(
-            route=route,
-            travel_date=travel_date,
-            current_price=current_price,
+            flight=flight,
+            route_config=route_config,
             previous_price=previous_price,
             price_change=price_change,
             price_change_pct=price_change_pct,
@@ -307,71 +401,37 @@ class FlightTrackerService:
             is_significant_drop=is_significant_drop,
         )
 
-    def _get_previous_price(
-        self,
-        route: RouteConfig,
-        travel_date: date,
-    ) -> int | None:
-        """Get previous price from state.
-
-        Args:
-            route: Route configuration.
-            travel_date: Travel date.
-
-        Returns:
-            Previous price or None if not tracked.
-        """
-        # First try local price store
-        route_str = f"{route.origin}-{route.destination}"
-        previous = self._price_store.get_previous_price(route_str, travel_date)
-        if previous is not None:
-            return previous
-
-        # Fall back to state manager if configured
-        if self._state_manager is None:
-            return None
-
-        route_key = route.get_route_key(travel_date)
-        return self._state_manager.get_last_flight_price(route_key)
-
-    def _update_price_state(
-        self,
-        route: RouteConfig,
-        travel_date: date,
-        price: int,
-    ) -> None:
-        """Update price in state.
-
-        Args:
-            route: Route configuration.
-            travel_date: Travel date.
-            price: Current price.
-        """
-        # Save to local price store
-        route_str = f"{route.origin}-{route.destination}"
-        self._price_store.set_price(route_str, travel_date, price)
-
-        # Also update state manager if configured
-        if self._state_manager is not None:
-            route_key = route.get_route_key(travel_date)
-            self._state_manager.set_flight_price(route_key, price)
-
     async def _send_notification(self, alert: PriceAlert) -> None:
         """Send notification for a price alert.
 
         Args:
             alert: Price alert to notify about.
         """
+        flight = alert.flight
+
         if self._notifier is None:
-            logger.info(f"Would notify: {alert.route} at ${alert.current_price:,}")
+            logger.info(
+                f"Would notify: {flight.route} {flight.departure_time} "
+                f"{flight.airline} at ${flight.price:,}"
+            )
             return
 
         try:
-            await self._notifier.send_flight_alert(
-                route=str(alert.route),
-                price=alert.current_price,
-                previous_price=alert.previous_price,
-                travel_date=alert.travel_date,
+            # Parse departure time to create datetime
+            from datetime import datetime as dt
+            hour, minute = map(int, flight.departure_time.split(":"))
+            departure_dt = dt.combine(
+                flight.travel_date,
+                time(hour, minute)
+            )
+
+            self._notifier.send_flight_alert(
+                route=flight.route,
+                price=flight.price,
+                airline=flight.airline,
+                departure=departure_dt,
+                link=f"https://www.google.com/travel/flights",  # Generic link
+                prev_price=alert.previous_price,
             )
         except Exception as e:
             logger.error(f"Failed to send notification: {e}")

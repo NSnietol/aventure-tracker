@@ -292,6 +292,16 @@ class ResultsPage:
             Flight info dictionary or None.
         """
         try:
+            # Try to extract from aria-label first (most reliable)
+            link_elem = await card.query_selector("[role='link'][aria-label]")
+            if link_elem:
+                aria_label = await link_elem.get_attribute("aria-label")
+                if aria_label:
+                    result = self._parse_aria_label(aria_label)
+                    if result and result.get("price"):
+                        return result
+
+            # Fallback to individual selectors
             # Extract price
             price_elem = await card.query_selector(ResultsLocators.PRICE_ELEMENT)
             price_text = await price_elem.text_content() if price_elem else None
@@ -300,9 +310,20 @@ class ResultsPage:
             if not price:
                 return None
 
-            # Extract airline
-            airline_elem = await card.query_selector(ResultsLocators.AIRLINE_NAME)
-            airline = await airline_elem.text_content() if airline_elem else "Unknown"
+            # Extract departure time from aria-label
+            time_elem = await card.query_selector("span[aria-label*='Hora de salida']")
+            departure_time = None
+            if time_elem:
+                time_label = await time_elem.get_attribute("aria-label")
+                if time_label:
+                    departure_time = self._parse_time(time_label)
+            
+            # Fallback time extraction
+            if not departure_time:
+                time_elem = await card.query_selector(ResultsLocators.DEPARTURE_TIME)
+                if time_elem:
+                    time_text = await time_elem.text_content()
+                    departure_time = self._parse_time(time_text)
 
             # Extract duration
             duration_elem = await card.query_selector(ResultsLocators.DURATION)
@@ -315,7 +336,8 @@ class ResultsPage:
 
             return {
                 "price": price,
-                "airline": airline.strip() if airline else "Unknown",
+                "airline": "Unknown",  # Can't reliably extract from selectors
+                "departure_time": departure_time,
                 "duration": duration.strip() if duration else "N/A",
                 "stops": stops,
             }
@@ -323,6 +345,98 @@ class ResultsPage:
         except Exception as e:
             logger.debug(f"Card extraction failed: {e}")
             return None
+
+    def _parse_aria_label(self, aria_label: str) -> dict | None:
+        """Parse flight info from aria-label attribute.
+
+        The aria-label contains structured info like:
+        "Precio total ida y vuelta desde 696318 pesos colombianos.
+         El precio no incluye acceso a los compartimentos superiores.
+         Vuelo sin escalas de Wingo.
+         Sale de ... a las 12:25 p.m. y llega a ... a las 1:43 p.m..
+         Duración total: 1 h 18 min."
+
+        Args:
+            aria_label: The aria-label text.
+
+        Returns:
+            Flight info dictionary or None.
+        """
+        try:
+            result = {
+                "price": None,
+                "airline": "Unknown",
+                "departure_time": None,
+                "duration": "N/A",
+                "stops": 0,
+            }
+
+            # Extract price: "desde NNNNNN pesos colombianos"
+            price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label)
+            if price_match:
+                result["price"] = int(price_match.group(1))
+
+            # Extract airline: "Vuelo sin escalas de AIRLINE" or "Vuelo con N escala(s) de AIRLINE"
+            airline_match = re.search(r"Vuelo (?:sin escalas|con \d+ escalas?) de ([^.]+)\.", aria_label)
+            if airline_match:
+                result["airline"] = airline_match.group(1).strip()
+
+            # Extract stops
+            if "sin escalas" in aria_label.lower():
+                result["stops"] = 0
+            else:
+                stops_match = re.search(r"con (\d+) escalas?", aria_label)
+                if stops_match:
+                    result["stops"] = int(stops_match.group(1))
+
+            # Extract departure time: "a las HH:MM a.m./p.m."
+            time_match = re.search(r"a las\s*(\d{1,2}:\d{2})\s*(a\.m\.|p\.m\.)", aria_label)
+            if time_match:
+                result["departure_time"] = self._parse_time(
+                    f"{time_match.group(1)} {time_match.group(2)}"
+                )
+
+            # Extract duration: "Duración total: X h Y min"
+            duration_match = re.search(r"Duración total:\s*(\d+\s*h(?:\s*\d+\s*min)?)", aria_label)
+            if duration_match:
+                result["duration"] = duration_match.group(1).strip()
+
+            return result if result["price"] else None
+
+        except Exception as e:
+            logger.debug(f"Failed to parse aria-label: {e}")
+            return None
+
+    def _parse_time(self, text: str | None) -> str | None:
+        """Parse time from text.
+
+        Args:
+            text: Time text like "6:30 p.m." or "18:30".
+
+        Returns:
+            Time in HH:MM format or None.
+        """
+        if not text:
+            return None
+
+        text = text.strip()
+
+        # Try to match HH:MM format
+        match = re.search(r"(\d{1,2}):(\d{2})", text)
+        if match:
+            hour = int(match.group(1))
+            minute = match.group(2)
+
+            # Handle AM/PM
+            text_lower = text.lower()
+            if "p" in text_lower and hour < 12:
+                hour += 12
+            elif "a" in text_lower and hour == 12:
+                hour = 0
+
+            return f"{hour:02d}:{minute}"
+
+        return None
 
     def _parse_price(self, text: str | None) -> int | None:
         """Parse price from text.

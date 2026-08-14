@@ -302,13 +302,25 @@ class GoogleFlightsScraper(BaseScraper):
             if not price:
                 return None
 
-            # Default times if not extracted
-            departure_dt = datetime.combine(travel_date, datetime.min.time())
-            arrival_dt = departure_dt + timedelta(hours=1)
+            # Parse departure time if available
+            departure_time_str = data.get("departure_time")
+            if departure_time_str:
+                try:
+                    hour, minute = map(int, departure_time_str.split(":"))
+                    departure_dt = datetime.combine(
+                        travel_date,
+                        datetime.min.time().replace(hour=hour, minute=minute)
+                    )
+                except (ValueError, AttributeError):
+                    departure_dt = datetime.combine(travel_date, datetime.min.time())
+            else:
+                departure_dt = datetime.combine(travel_date, datetime.min.time())
 
             # Parse duration if available
             duration_str = data.get("duration", "1h")
             duration = self._parse_duration(duration_str)
+
+            arrival_dt = departure_dt + duration
 
             return FlightResult(
                 price=price,

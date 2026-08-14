@@ -484,20 +484,25 @@ async def async_main(args: argparse.Namespace) -> int:
         print(f"\nFlights:")
         print(f"  Routes checked: {result.flights_result.routes_checked}")
         print(f"  Dates checked: {result.flights_result.dates_checked}")
+        print(f"  Flights found: {result.flights_result.flights_found}")
         print(f"  Alerts: {result.flights_result.alerts_generated}")
 
         if result.flights_result.prices_found:
-            print(f"\n  Prices found ({len(result.flights_result.prices_found)}):")
+            print(f"\n  Flights tracked ({len(result.flights_result.prices_found)}):")
             # Group by route for cleaner output
             current_route = None
-            for pf in sorted(
+            for flight in sorted(
                 result.flights_result.prices_found,
-                key=lambda x: (x.route, x.travel_date),
+                key=lambda x: (x.route, x.travel_date, x.departure_time),
             ):
-                if pf.route != current_route:
-                    current_route = pf.route
-                    print(f"    {pf.route}:")
-                print(f"      {pf.travel_date}: ${pf.price:,} COP")
+                if flight.route != current_route:
+                    current_route = flight.route
+                    print(f"    {flight.route}:")
+                priority = "★" if flight.is_priority else ""
+                print(
+                    f"      {flight.travel_date} {flight.departure_time} "
+                    f"{flight.airline}{priority}: ${flight.price:,} COP"
+                )
 
     if result.activities_result:
         print(f"\nActivities:")
