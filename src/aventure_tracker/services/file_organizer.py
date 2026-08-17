@@ -101,7 +101,7 @@ def detect_file_type(file_path: Path) -> str | None:
             return "webp"
 
         return None
-    except (OSError, IOError):
+    except OSError:
         return None
 
 
@@ -266,7 +266,7 @@ class FileOrganizer:
                 month=month,
                 success=True,
             )
-        except (OSError, IOError) as e:
+        except OSError as e:
             return OrganizedFile(
                 original_path=file_path,
                 new_path=new_path,

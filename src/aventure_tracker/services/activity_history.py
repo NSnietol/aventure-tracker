@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -91,7 +91,9 @@ class ActivityHistoryManager:
 
         self._history_path = history_path
         self._max_checks = max_checks
-        self._records: dict[str, dict[str, ActivityRecord]] = {}  # account -> post_id -> record
+        self._records: dict[
+            str, dict[str, ActivityRecord]
+        ] = {}  # account -> post_id -> record
         self._loaded = False
 
     @property
@@ -145,7 +147,13 @@ class ActivityHistoryManager:
 
         try:
             with open(self._history_path, "w", encoding="utf-8") as f:
-                yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                yaml.dump(
+                    data,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
 
             logger.info(f"Saved history: {self.total_records} records")
 
@@ -272,7 +280,9 @@ class ActivityHistoryManager:
             )
             self._records[account][post_id] = record
 
-        logger.debug(f"Recorded check: @{account}/{post_id} (count: {record.times_checked})")
+        logger.debug(
+            f"Recorded check: @{account}/{post_id} (count: {record.times_checked})"
+        )
         return record
 
     def get_account_history(self, account: str) -> list[ActivityRecord]:
@@ -308,7 +318,8 @@ class ActivityHistoryManager:
             return 0
 
         return sum(
-            1 for r in self._records[account].values()
+            1
+            for r in self._records[account].values()
             if r.times_checked >= self._max_checks
         )
 

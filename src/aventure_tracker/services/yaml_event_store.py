@@ -130,9 +130,7 @@ class YAMLEventStore:
                 return event
         return None
 
-    def delete_event(
-        self, event_id: str, agency: str, year: int, month: str
-    ) -> bool:
+    def delete_event(self, event_id: str, agency: str, year: int, month: str) -> bool:
         """Delete an event by ID.
 
         Args:
@@ -190,12 +188,14 @@ class YAMLEventStore:
                 events_file = month_dir / "events.yaml"
                 if events_file.exists():
                     events = self.load_events(agency, dir_year, month_dir.name)
-                    results.append({
-                        "agency": agency,
-                        "year": dir_year,
-                        "month": month_dir.name,
-                        "event_count": len(events),
-                    })
+                    results.append(
+                        {
+                            "agency": agency,
+                            "year": dir_year,
+                            "month": month_dir.name,
+                            "event_count": len(events),
+                        }
+                    )
 
         return sorted(results, key=lambda x: (x["year"], x["month"]))
 

@@ -77,8 +77,7 @@ class WeekendMatch:
     def date_label(self) -> str:
         """Human readable window label."""
         return (
-            f"{self.window_start.strftime('%d')}-"
-            f"{self.window_end.strftime('%d %b %Y')}"
+            f"{self.window_start.strftime('%d')}-{self.window_end.strftime('%d %b %Y')}"
         )
 
 

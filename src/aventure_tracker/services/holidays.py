@@ -65,7 +65,9 @@ class HolidayService:
                             holiday_date = date.fromisoformat(date_str)
                             self._holidays_cache[year].append(holiday_date)
                         except ValueError as e:
-                            logger.warning(f"Invalid date format in config: {date_str} - {e}")
+                            logger.warning(
+                                f"Invalid date format in config: {date_str} - {e}"
+                            )
 
             logger.info(
                 f"Loaded holidays for years: {list(self._holidays_cache.keys())}"
@@ -229,7 +231,9 @@ class HolidayService:
 
             holidays_dict = data.get("holidays", {})
             # Try both string and int keys (YAML may parse years as int)
-            year_data = holidays_dict.get(str(day.year), holidays_dict.get(day.year, []))
+            year_data = holidays_dict.get(
+                str(day.year), holidays_dict.get(day.year, [])
+            )
 
             for holiday in year_data:
                 date_str = holiday.get("date")

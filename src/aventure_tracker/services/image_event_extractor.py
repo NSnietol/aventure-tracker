@@ -22,18 +22,31 @@ from aventure_tracker.models.extracted_event import (
 
 # Month name to number mapping
 MONTH_MAP = {
-    "ene": 1, "enero": 1,
-    "feb": 2, "febrero": 2,
-    "mar": 3, "marzo": 3,
-    "abr": 4, "abril": 4,
-    "may": 5, "mayo": 5,
-    "jun": 6, "junio": 6,
-    "jul": 7, "julio": 7,
-    "ago": 8, "agosto": 8,
-    "sep": 9, "sept": 9, "septiembre": 9,
-    "oct": 10, "octubre": 10,
-    "nov": 11, "noviembre": 11,
-    "dic": 12, "diciembre": 12,
+    "ene": 1,
+    "enero": 1,
+    "feb": 2,
+    "febrero": 2,
+    "mar": 3,
+    "marzo": 3,
+    "abr": 4,
+    "abril": 4,
+    "may": 5,
+    "mayo": 5,
+    "jun": 6,
+    "junio": 6,
+    "jul": 7,
+    "julio": 7,
+    "ago": 8,
+    "agosto": 8,
+    "sep": 9,
+    "sept": 9,
+    "septiembre": 9,
+    "oct": 10,
+    "octubre": 10,
+    "nov": 11,
+    "noviembre": 11,
+    "dic": 12,
+    "diciembre": 12,
 }
 
 EXTRACTION_PROMPT = """Analiza esta imagen de un calendario de viajes de una agencia turística colombiana.
@@ -59,6 +72,7 @@ JSON:"""
 
 class ModelProvider(Enum):
     """Available model providers."""
+
     GEMINI = "gemini"
     OLLAMA = "ollama"
 
@@ -90,7 +104,7 @@ class ImageEventExtractor:
         """
         self.config = config or ExtractionConfig()
         self._gemini_model = None
-        
+
         # Auto-detect API key from environment
         if self.config.gemini_api_key is None:
             self.config.gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -99,12 +113,12 @@ class ImageEventExtractor:
         """Lazy-load Gemini client."""
         if self._gemini_model is None:
             from google import genai
-            
+
             if not self.config.gemini_api_key:
                 raise ValueError("GEMINI_API_KEY not set")
-            
+
             self._gemini_model = genai.Client(api_key=self.config.gemini_api_key)
-        
+
         return self._gemini_model
 
     def extract_from_image(
@@ -125,7 +139,7 @@ class ImageEventExtractor:
         """
         image_path = Path(image_path)
         month = month or self.config.default_month
-        
+
         if self.config.provider == ModelProvider.GEMINI:
             return self._extract_with_gemini(image_path, agency, month)
         else:
@@ -139,21 +153,21 @@ class ImageEventExtractor:
     ) -> ExtractionResult:
         """Extract using Google Gemini API."""
         start_time = time.time()
-        
+
         try:
             from google.genai import types
-            
+
             client = self._get_gemini_client()
-            
+
             # Read image as bytes
             with open(image_path, "rb") as f:
                 image_bytes = f.read()
-            
+
             # Detect mime type
             mime_type = "image/jpeg"
-            if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+            if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
                 mime_type = "image/png"
-            
+
             # Call Gemini
             response = client.models.generate_content(
                 model=self.config.gemini_model,
@@ -166,14 +180,14 @@ class ImageEventExtractor:
                     max_output_tokens=2048,
                 ),
             )
-            
+
             raw_text = response.text
-            
+
             # Parse events from response
             events = self._parse_response(raw_text, agency, month, image_path)
-            
+
             processing_time = int((time.time() - start_time) * 1000)
-            
+
             return ExtractionResult(
                 source_image=image_path,
                 agency=agency,
@@ -184,7 +198,7 @@ class ImageEventExtractor:
                 processing_time_ms=processing_time,
                 success=True,
             )
-            
+
         except Exception as e:
             processing_time = int((time.time() - start_time) * 1000)
             return ExtractionResult(
@@ -206,7 +220,7 @@ class ImageEventExtractor:
     ) -> ExtractionResult:
         """Extract using local Ollama API."""
         import requests
-        
+
         start_time = time.time()
 
         try:
@@ -288,7 +302,7 @@ class ImageEventExtractor:
             List of ExtractionResult for each image.
         """
         from aventure_tracker.services.file_organizer import detect_file_type
-        
+
         directory = Path(directory)
         results: list[ExtractionResult] = []
 

@@ -2,7 +2,6 @@
 
 import logging
 import re
-import tempfile
 from dataclasses import dataclass
 from datetime import date, datetime
 from io import BytesIO
@@ -428,18 +427,30 @@ class OCRProcessor:
         ]
 
         month_map = {
-            "enero": 1, "ene": 1,
-            "febrero": 2, "feb": 2,
-            "marzo": 3, "mar": 3,
-            "abril": 4, "abr": 4,
-            "mayo": 5, "may": 5,
-            "junio": 6, "jun": 6,
-            "julio": 7, "jul": 7,
-            "agosto": 8, "ago": 8,
-            "septiembre": 9, "sep": 9,
-            "octubre": 10, "oct": 10,
-            "noviembre": 11, "nov": 11,
-            "diciembre": 12, "dic": 12,
+            "enero": 1,
+            "ene": 1,
+            "febrero": 2,
+            "feb": 2,
+            "marzo": 3,
+            "mar": 3,
+            "abril": 4,
+            "abr": 4,
+            "mayo": 5,
+            "may": 5,
+            "junio": 6,
+            "jun": 6,
+            "julio": 7,
+            "jul": 7,
+            "agosto": 8,
+            "ago": 8,
+            "septiembre": 9,
+            "sep": 9,
+            "octubre": 10,
+            "oct": 10,
+            "noviembre": 11,
+            "nov": 11,
+            "diciembre": 12,
+            "dic": 12,
         }
 
         # Try Spanish month format

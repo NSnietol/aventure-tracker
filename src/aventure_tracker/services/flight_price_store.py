@@ -1,7 +1,7 @@
 """Flight price store using YAML for local persistence."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -162,7 +162,6 @@ class FlightHistory:
         # Normalize airline name (remove spaces, uppercase)
         airline_clean = airline.upper().replace(" ", "_")
         return f"{route}_{travel_date.isoformat()}_{departure_time}_{airline_clean}"
-
 
 
 class FlightPriceStore:

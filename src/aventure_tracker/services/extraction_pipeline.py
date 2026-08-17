@@ -151,7 +151,9 @@ class ExtractionPipeline:
             # Calculate totals
             stats.images_processed = sum(1 for r in extraction_results if r.success)
             stats.images_failed = sum(1 for r in extraction_results if not r.success)
-            stats.processing_time_ms = sum(r.processing_time_ms for r in extraction_results)
+            stats.processing_time_ms = sum(
+                r.processing_time_ms for r in extraction_results
+            )
 
         except Exception as e:
             stats.errors.append(f"Pipeline error: {e}")
