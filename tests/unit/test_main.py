@@ -531,15 +531,12 @@ class TestInitInfrastructure:
     @pytest.mark.asyncio
     async def test_init_with_credentials_in_ci(self, mock_settings: Settings) -> None:
         """Test initialization with valid credentials in CI environment."""
-        orchestrator = AdventureOrchestrator(settings=mock_settings)
-
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
             with patch("aventure_tracker.main.StateManager") as mock_state_cls:
                 mock_state = MagicMock()
-                mock_state.read = MagicMock()
+                mock_state.read = MagicMock(return_value=None)  # read() must not raise
                 mock_state_cls.return_value = mock_state
 
-                # Re-create orchestrator inside patch context so is_ci returns True
                 mock_settings_ci = Settings(
                     config_dir=mock_settings.config_dir,
                     gist_id="valid_gist",
@@ -548,9 +545,9 @@ class TestInitInfrastructure:
                 orchestrator = AdventureOrchestrator(settings=mock_settings_ci)
                 await orchestrator._init_infrastructure()
 
-            # Check infrastructure was created (only in CI)
-            assert orchestrator._state_manager is not None
-            mock_state.read.assert_called_once()
+        # Check infrastructure was created (only in CI)
+        assert orchestrator._state_manager is not None
+        mock_state.read.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_init_without_credentials(self, tmp_path: Path) -> None:
