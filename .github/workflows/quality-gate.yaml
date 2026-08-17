@@ -32,7 +32,7 @@ jobs:
       # Playwright is NOT installed — scrapers are mocked in unit tests
 
       - name: Lint (ruff)
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ --output-format github
 
       - name: Format check (ruff)
         run: ruff format --check src/ tests/
