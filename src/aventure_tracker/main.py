@@ -13,20 +13,20 @@ from pathlib import Path
 from aventure_tracker.config import Settings
 from aventure_tracker.infrastructure.email_notifier import EmailNotifier
 from aventure_tracker.infrastructure.state_manager import StateManager
-from aventure_tracker.services.activity_tracker import (
-    ActivityTrackerResult,
-    ActivityTrackerService,
-)
-from aventure_tracker.services.event_matcher import EventMatcher
-from aventure_tracker.services.flight_calendar import (
+from aventure_tracker.services.flights.calendar import (
     FlightCalendarDisplay,
 )
-from aventure_tracker.services.flight_dates import FlightDateCalculator
-from aventure_tracker.services.flight_tracker import (
+from aventure_tracker.services.flights.dates import FlightDateCalculator
+from aventure_tracker.services.flights.matcher import EventMatcher
+from aventure_tracker.services.flights.tracker import (
     FlightTrackerResult,
     FlightTrackerService,
 )
-from aventure_tracker.services.holidays import HolidayService
+from aventure_tracker.services.instagram.tracker import (
+    ActivityTrackerResult,
+    ActivityTrackerService,
+)
+from aventure_tracker.services.shared.holidays import HolidayService
 
 # Default weeks ahead for flight calendar (user requested 2.5 months planning horizon)
 DEFAULT_WEEKS_AHEAD = 10
@@ -278,8 +278,8 @@ class AdventureOrchestrator:
                         self._logger.info("Step 3/3: No cheap flights — no report sent")
 
                 except Exception as e:
-                    error = f"Flight tracker failed: {e}"
-                    self._logger.error(error)
+                    error = f"[{type(e).__name__}] Flight tracker failed: {e}"
+                    self._logger.error(error, exc_info=True)
                     errors.append(error)
 
             # Show calendar after flight tracking if requested
@@ -386,13 +386,13 @@ class AdventureOrchestrator:
         """
         import os
 
-        from aventure_tracker.services.extraction_cache import ExtractionCache
-        from aventure_tracker.services.file_organizer import detect_file_type
-        from aventure_tracker.services.image_event_extractor import (
+        from aventure_tracker.services.extraction.cache import ExtractionCache
+        from aventure_tracker.services.extraction.extractor import (
             ExtractionConfig,
             ImageEventExtractor,
             ModelProvider,
         )
+        from aventure_tracker.services.extraction.organizer import detect_file_type
 
         inbox_path = Path("inbox")
         cache_path = Path("data/extraction_cache.yaml")
@@ -460,7 +460,7 @@ class AdventureOrchestrator:
         Args:
             flights_result: Result from flight tracker with price_alerts.
         """
-        from aventure_tracker.services.flight_tracker import (
+        from aventure_tracker.services.flights.tracker import (
             FlightFound,
         )
 
@@ -621,7 +621,7 @@ class AdventureOrchestrator:
         from datetime import time as dtime
         from datetime import timedelta
 
-        from aventure_tracker.services.flight_tracker import ReturnOption, WeekendPair
+        from aventure_tracker.services.flights.tracker import ReturnOption, WeekendPair
 
         # Build a quick lookup: window_start → WeekendMatch
         match_by_window: dict = {}
@@ -769,7 +769,7 @@ class AdventureOrchestrator:
         """
         from datetime import timedelta
 
-        from aventure_tracker.services.flight_tracker import ReturnOption, WeekendPair
+        from aventure_tracker.services.flights.tracker import ReturnOption, WeekendPair
 
         match_by_window: dict = {}
         for m in weekend_matches:

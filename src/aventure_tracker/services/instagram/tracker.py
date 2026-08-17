@@ -13,10 +13,10 @@ from aventure_tracker.models.activity import (
     InstagramPost,
 )
 from aventure_tracker.scrapers.instagram import InstagramScraper
-from aventure_tracker.services.activity_history import ActivityHistoryManager
-from aventure_tracker.services.event_extractor import extract_event_info
-from aventure_tracker.services.inventory import InventoryManager, MatchResult
-from aventure_tracker.services.ocr import ExtractedActivity, OCRProcessor
+from aventure_tracker.services.instagram.extractor import extract_event_info
+from aventure_tracker.services.instagram.history import ActivityHistoryManager
+from aventure_tracker.services.instagram.inventory import InventoryManager, MatchResult
+from aventure_tracker.services.instagram.ocr import ExtractedActivity, OCRProcessor
 
 logger = logging.getLogger(__name__)
 

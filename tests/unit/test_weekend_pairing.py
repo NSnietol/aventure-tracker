@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from unittest.mock import MagicMock
 
 from aventure_tracker.main import AdventureOrchestrator
-from aventure_tracker.services.flight_tracker import (
+from aventure_tracker.services.flights.tracker import (
     FlightFound,
 )
 

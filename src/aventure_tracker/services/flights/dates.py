@@ -5,7 +5,7 @@ from datetime import date, time, timedelta
 from pathlib import Path
 
 from aventure_tracker.models.flight import TimeRange, WeekendTrip
-from aventure_tracker.services.holidays import HolidayService
+from aventure_tracker.services.shared.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 

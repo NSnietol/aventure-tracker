@@ -15,8 +15,8 @@ from aventure_tracker.main import (
     async_main,
     create_parser,
 )
-from aventure_tracker.services.activity_tracker import ActivityTrackerResult
-from aventure_tracker.services.flight_tracker import FlightTrackerResult
+from aventure_tracker.services.flights.tracker import FlightTrackerResult
+from aventure_tracker.services.instagram.tracker import ActivityTrackerResult
 
 
 @pytest.fixture
@@ -530,14 +530,14 @@ class TestInitInfrastructure:
 
     @pytest.mark.asyncio
     async def test_init_with_credentials_in_ci(self, mock_settings: Settings) -> None:
-        """Test initialization with valid credentials in CI environment."""
+        """Test that StateManager is created when is_ci=True and gist credentials present."""
         with patch("aventure_tracker.main.StateManager") as mock_state_cls:
             mock_state = MagicMock()
             mock_state.read = MagicMock(return_value=None)
             mock_state_cls.return_value = mock_state
 
-            # Settings uses aliases GITHUB_GIST_ID / GITHUB_GIST_TOKEN, not field names.
-            # Set all three via env vars so pydantic-settings picks them up correctly.
+            # Settings uses aliases (GITHUB_GIST_ID, GITHUB_GIST_TOKEN) not field names.
+            # Set them via env vars so pydantic-settings picks them up correctly.
             with patch.dict(
                 os.environ,
                 {

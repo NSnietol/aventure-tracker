@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from aventure_tracker.models.flight import RouteConfig, WeekendTrip
-from aventure_tracker.services.flight_calendar import (
+from aventure_tracker.services.flights.calendar import (
     DEFAULT_WEEKS,
     INDICATOR_BRIDGE,
     INDICATOR_DOWN,

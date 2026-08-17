@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aventure_tracker.services.file_organizer import (
+from aventure_tracker.services.extraction.organizer import (
     FileOrganizer,
     detect_file_type,
     get_month_number,

@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from aventure_tracker.models.extracted_event import ExtractedEvent
-from aventure_tracker.services.yaml_event_store import YAMLEventStore
+from aventure_tracker.services.extraction.yaml_store import YAMLEventStore
 
 
 @pytest.fixture

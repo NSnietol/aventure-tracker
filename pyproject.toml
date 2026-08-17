@@ -68,11 +68,8 @@ select = ["E", "F", "W", "I", "B"]
 ignore = ["E501", "B904"]
 
 [tool.ruff.lint.per-file-ignores]
-# Test files
 "tests/**/*.py" = ["S", "ANN", "N", "F841", "W291", "W293"]
-# HTML builder uses complex f-strings — ruff F821 false positives
 "src/aventure_tracker/infrastructure/email_notifier.py" = ["F821"]
-# Scrapers: random is intentional for human-like delays
 "src/aventure_tracker/scrapers/**/*.py" = ["S311", "S108"]
 
 [tool.ruff.lint.pydocstyle]

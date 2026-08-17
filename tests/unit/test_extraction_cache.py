@@ -9,7 +9,7 @@ from aventure_tracker.models.extracted_event import (
     ExtractedEvent,
     ExtractionResult,
 )
-from aventure_tracker.services.extraction_cache import (
+from aventure_tracker.services.extraction.cache import (
     CacheEntry,
     ExtractionCache,
 )

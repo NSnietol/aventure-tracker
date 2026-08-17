@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from aventure_tracker.services.event_matcher import (
+from aventure_tracker.services.flights.matcher import (
     EventMatcher,
     MatchedEvent,
     WeekendMatch,

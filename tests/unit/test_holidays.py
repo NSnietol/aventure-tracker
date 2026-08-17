@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from aventure_tracker.services.holidays import HolidayService
+from aventure_tracker.services.shared.holidays import HolidayService
 
 
 @pytest.fixture

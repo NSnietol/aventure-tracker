@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from aventure_tracker.models.flight import FlightResult, RouteConfig
-from aventure_tracker.services.flight_tracker import (
+from aventure_tracker.services.flights.tracker import (
     FlightFound,
     FlightTrackerResult,
     FlightTrackerService,

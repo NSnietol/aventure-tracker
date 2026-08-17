@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from aventure_tracker.models.extracted_event import ExtractedEvent
-from aventure_tracker.services.price_history import (
+from aventure_tracker.services.shared.price_history import (
     PriceChange,
     PriceHistoryDB,
     PriceRecord,
