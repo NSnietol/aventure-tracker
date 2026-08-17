@@ -274,7 +274,9 @@ class DestinationsConfig(BaseModel):
         """
         with open(path, "w", encoding="utf-8") as f:
             f.write("# Destinations Config - Blacklist Only\n")
-            f.write("# Recibes notificaciones de TODOS los planes EXCEPTO los que están aquí.\n\n")
+            f.write(
+                "# Recibes notificaciones de TODOS los planes EXCEPTO los que están aquí.\n\n"
+            )
             yaml.dump(
                 {"blacklist": self.blacklist},
                 f,
@@ -282,5 +284,3 @@ class DestinationsConfig(BaseModel):
                 default_flow_style=False,
                 sort_keys=False,
             )
-
-

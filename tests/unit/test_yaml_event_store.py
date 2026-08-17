@@ -209,7 +209,11 @@ class TestYAMLEventStore:
 
         # Save more events with merge
         store.save_events(
-            sample_events[1:], agency="brutaltravel", year=2026, month="agosto", merge=True
+            sample_events[1:],
+            agency="brutaltravel",
+            year=2026,
+            month="agosto",
+            merge=True,
         )
 
         loaded = store.load_events(agency="brutaltravel", year=2026, month="agosto")
@@ -234,7 +238,11 @@ class TestYAMLEventStore:
         )
 
         store.save_events(
-            [updated_event], agency="brutaltravel", year=2026, month="agosto", merge=True
+            [updated_event],
+            agency="brutaltravel",
+            year=2026,
+            month="agosto",
+            merge=True,
         )
 
         loaded = store.load_events(agency="brutaltravel", year=2026, month="agosto")
@@ -363,7 +371,9 @@ class TestYAMLEventStore:
             price=100000,
             agency="brutaltravel",
         )
-        store.save_events([event_2025], agency="brutaltravel", year=2025, month="agosto")
+        store.save_events(
+            [event_2025], agency="brutaltravel", year=2025, month="agosto"
+        )
 
         months = store.list_available_months(agency="brutaltravel", year=2026)
 
@@ -401,9 +411,7 @@ class TestYAMLEventStore:
         """Should save events sorted by date."""
         # Shuffle the events
         shuffled = [sample_events[2], sample_events[0], sample_events[1]]
-        store.save_events(
-            shuffled, agency="brutaltravel", year=2026, month="agosto"
-        )
+        store.save_events(shuffled, agency="brutaltravel", year=2026, month="agosto")
 
         loaded = store.load_events(agency="brutaltravel", year=2026, month="agosto")
 

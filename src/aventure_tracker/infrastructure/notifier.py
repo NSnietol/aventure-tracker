@@ -357,7 +357,26 @@ class TelegramNotifier:
             Escaped text safe for Markdown.
         """
         # Characters that need escaping in Markdown
-        special_chars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+        special_chars = [
+            "_",
+            "*",
+            "[",
+            "]",
+            "(",
+            ")",
+            "~",
+            "`",
+            ">",
+            "#",
+            "+",
+            "-",
+            "=",
+            "|",
+            "{",
+            "}",
+            ".",
+            "!",
+        ]
 
         for char in special_chars:
             text = text.replace(char, f"\\{char}")

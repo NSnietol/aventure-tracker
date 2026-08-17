@@ -74,12 +74,7 @@ class GoogleFlightsScraper(BaseScraper):
 
         query = " ".join(query_parts)
 
-        url = (
-            f"{BASE_URL}?"
-            f"q={quote(query)}"
-            f"&curr={self._currency}"
-            f"&hl={self._language}"
-        )
+        url = f"{BASE_URL}?q={quote(query)}&curr={self._currency}&hl={self._language}"
 
         return url
 
@@ -309,7 +304,7 @@ class GoogleFlightsScraper(BaseScraper):
                     hour, minute = map(int, departure_time_str.split(":"))
                     departure_dt = datetime.combine(
                         travel_date,
-                        datetime.min.time().replace(hour=hour, minute=minute)
+                        datetime.min.time().replace(hour=hour, minute=minute),
                     )
                 except (ValueError, AttributeError):
                     departure_dt = datetime.combine(travel_date, datetime.min.time())

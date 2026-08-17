@@ -230,6 +230,7 @@ class TestImageEventExtractor:
     ) -> None:
         """Should handle Ollama not running."""
         import requests
+
         mock_post.side_effect = requests.exceptions.ConnectionError()
 
         image_path = tmp_path / "test.jpg"
@@ -278,9 +279,11 @@ class TestImageEventExtractor:
         mock_post.return_value = mock_response
 
         # Create test images with JPEG magic bytes (including .txt which may be renamed jpegs)
-        jpeg_magic = b'\xff\xd8\xff\xe0'
+        jpeg_magic = b"\xff\xd8\xff\xe0"
         (tmp_path / "cal1.jpg").write_bytes(jpeg_magic + b"img1")
-        (tmp_path / "cal2.txt").write_bytes(jpeg_magic + b"img2")  # .txt with JPEG magic bytes
+        (tmp_path / "cal2.txt").write_bytes(
+            jpeg_magic + b"img2"
+        )  # .txt with JPEG magic bytes
         (tmp_path / "readme.md").write_text("not an image")
 
         results = extractor.extract_from_directory(

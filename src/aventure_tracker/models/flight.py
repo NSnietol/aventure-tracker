@@ -1,15 +1,13 @@
 """Flight-related data models."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
-
-from enum import Enum
-from typing import Literal
 
 if TYPE_CHECKING:
     from aventure_tracker.config import Settings
@@ -70,7 +68,9 @@ class AirlinePolicy(BaseModel):
         upper = airline.upper()
         return any(p.upper() in upper for p in self.priority_airlines)
 
-    def should_track(self, airline: str, price: int, route_threshold: int) -> tuple[bool, str]:
+    def should_track(
+        self, airline: str, price: int, route_threshold: int
+    ) -> tuple[bool, str]:
         """Decide if a flight should be tracked.
 
         Args:
@@ -84,22 +84,37 @@ class AirlinePolicy(BaseModel):
         # Rule 1: Priority airline within route threshold
         if self.is_priority(airline):
             if price <= route_threshold:
-                return True, f"priority airline, price ${price:,} ≤ threshold ${route_threshold:,}"
-            return False, f"priority airline but price ${price:,} > threshold ${route_threshold:,}"
+                return (
+                    True,
+                    f"priority airline, price ${price:,} ≤ threshold ${route_threshold:,}",
+                )
+            return (
+                False,
+                f"priority airline but price ${price:,} > threshold ${route_threshold:,}",
+            )
 
         # Rule 2: Bargain — any airline below absolute floor
         if price <= self.bargain_threshold:
-            return True, f"bargain price ${price:,} ≤ bargain_threshold ${self.bargain_threshold:,}"
+            return (
+                True,
+                f"bargain price ${price:,} ≤ bargain_threshold ${self.bargain_threshold:,}",
+            )
 
         # Rule 3: Extra airline rules
         for rule in self.extra_airlines:
             if rule.matches(airline):
                 if rule.max_price is None or price <= rule.max_price:
                     return True, f"extra rule for {rule.name}, price ${price:,}"
-                return False, f"extra rule for {rule.name} but price ${price:,} > ${rule.max_price:,}"
+                return (
+                    False,
+                    f"extra rule for {rule.name} but price ${price:,} > ${rule.max_price:,}",
+                )
 
         # Rule 4: Skip
-        return False, f"not priority, price ${price:,} > bargain_threshold ${self.bargain_threshold:,}"
+        return (
+            False,
+            f"not priority, price ${price:,} > bargain_threshold ${self.bargain_threshold:,}",
+        )
 
     def add_airline(self, name: str, max_price: int | None = None) -> None:
         """Add an airline rule at runtime without reloading config.
@@ -136,7 +151,9 @@ class RouteConfig(BaseModel):
         search_days: Days of the week to search for this route.
     """
 
-    origin: str = Field(..., min_length=3, max_length=3, description="Origin airport IATA code")
+    origin: str = Field(
+        ..., min_length=3, max_length=3, description="Origin airport IATA code"
+    )
     destination: str = Field(
         ..., min_length=3, max_length=3, description="Destination airport IATA code"
     )
@@ -178,7 +195,9 @@ class RoutesConfig(BaseModel):
     airline_policy: AirlinePolicy = Field(default_factory=AirlinePolicy.default)
 
     @classmethod
-    def from_yaml(cls, path: Path, settings: "Settings | None" = None) -> "RoutesConfig":
+    def from_yaml(
+        cls, path: Path, settings: "Settings | None" = None
+    ) -> "RoutesConfig":
         """Load routes configuration from a YAML file.
 
         If settings are provided, env var overrides take precedence:
@@ -212,7 +231,9 @@ class RoutesConfig(BaseModel):
                     route.price_threshold = settings.flight_price_threshold
 
             if settings.flight_bargain_threshold is not None:
-                config.airline_policy.bargain_threshold = settings.flight_bargain_threshold
+                config.airline_policy.bargain_threshold = (
+                    settings.flight_bargain_threshold
+                )
 
             if settings.flight_extra_max_price is not None:
                 for rule in config.airline_policy.extra_airlines:

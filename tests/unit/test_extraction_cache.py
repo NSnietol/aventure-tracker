@@ -102,7 +102,7 @@ class TestExtractionCache:
         """Getting cached result after add should return entry."""
         cache.add(sample_result)
         entry = cache.get_cached(sample_result.source_image)
-        
+
         assert entry is not None
         assert entry.agency == "test-agency"
         assert entry.events_count == 1
@@ -115,10 +115,10 @@ class TestExtractionCache:
         # Create cache and add entry
         cache1 = ExtractionCache(cache_file)
         cache1.add(sample_result)
-        
+
         # Create new cache instance pointing to same file
         cache2 = ExtractionCache(cache_file)
-        
+
         assert cache2.is_processed(sample_result.source_image) is True
 
     def test_remove_entry(
@@ -127,7 +127,7 @@ class TestExtractionCache:
         """Should be able to remove cached entries."""
         cache.add(sample_result)
         assert cache.is_processed(sample_result.source_image) is True
-        
+
         removed = cache.remove(sample_result.source_image)
         assert removed is True
         assert cache.is_processed(sample_result.source_image) is False
@@ -145,7 +145,7 @@ class TestExtractionCache:
         """Should be able to clear all entries."""
         cache.add(sample_result)
         assert len(cache) == 1
-        
+
         count = cache.clear()
         assert count == 1
         assert len(cache) == 0
@@ -156,7 +156,7 @@ class TestExtractionCache:
         """Should be able to clear entries for a specific agency."""
         # Add first result
         cache.add(sample_result)
-        
+
         # Create second result with different agency
         image2 = tmp_path / "other.jpg"
         image2.write_bytes(b"other content")
@@ -176,9 +176,9 @@ class TestExtractionCache:
             success=True,
         )
         cache.add(result2)
-        
+
         assert len(cache) == 2
-        
+
         # Clear only test-agency
         count = cache.clear_agency("test-agency")
         assert count == 1
@@ -191,15 +191,13 @@ class TestExtractionCache:
         """Should return cache statistics."""
         cache.add(sample_result)
         stats = cache.get_stats()
-        
+
         assert stats["total_images"] == 1
         assert stats["total_events"] == 1
         assert stats["covers"] == 0
         assert stats["by_agency"]["test-agency"] == 1
 
-    def test_cover_detection(
-        self, cache: ExtractionCache, sample_image: Path
-    ) -> None:
+    def test_cover_detection(self, cache: ExtractionCache, sample_image: Path) -> None:
         """Empty results should be marked as cover pages."""
         result = ExtractionResult(
             source_image=sample_image,
@@ -210,21 +208,24 @@ class TestExtractionCache:
             success=True,
         )
         cache.add(result)
-        
+
         entry = cache.get_cached(sample_image)
         assert entry is not None
         assert entry.is_cover is True
         assert entry.events_count == 0
-        
+
         stats = cache.get_stats()
         assert stats["covers"] == 1
 
     def test_contains_operator(
-        self, cache: ExtractionCache, sample_image: Path, sample_result: ExtractionResult
+        self,
+        cache: ExtractionCache,
+        sample_image: Path,
+        sample_result: ExtractionResult,
     ) -> None:
         """Should support 'in' operator."""
         assert sample_image not in cache
-        
+
         cache.add(sample_result)
         assert sample_result.source_image in cache
 
@@ -245,22 +246,20 @@ class TestCacheEntry:
             source_path="/path/to/image.jpg",
             events_data=[{"name": "Event 1"}],
         )
-        
+
         data = entry.to_dict()
         restored = CacheEntry.from_dict(data)
-        
+
         assert restored.image_hash == entry.image_hash
         assert restored.agency == entry.agency
         assert restored.events_count == entry.events_count
         assert restored.is_cover == entry.is_cover
 
-    def test_from_extraction_result(
-        self, sample_result: ExtractionResult
-    ) -> None:
+    def test_from_extraction_result(self, sample_result: ExtractionResult) -> None:
         """Should create entry from extraction result."""
         image_hash = "test_hash_123"
         entry = CacheEntry.from_extraction_result(sample_result, image_hash)
-        
+
         assert entry.image_hash == image_hash
         assert entry.agency == "test-agency"
         assert entry.events_count == 1

@@ -1,7 +1,7 @@
 """Email notification service using Resend API."""
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Colombia timezone: UTC-5 (no DST)
 _TZ_COLOMBIA = timezone(timedelta(hours=-5))
@@ -10,6 +10,7 @@ _TZ_COLOMBIA = timezone(timedelta(hours=-5))
 def _now_colombia() -> datetime:
     """Return current datetime in Colombia timezone (UTC-5)."""
     return datetime.now(_TZ_COLOMBIA)
+
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class EmailNotifier:
             to_email: Recipient email address.
         """
         import resend
+
         resend.api_key = api_key
         self._resend = resend
         self._to_email = to_email
@@ -47,12 +49,14 @@ class EmailNotifier:
             True if sent successfully.
         """
         try:
-            self._resend.Emails.send({
-                "from": RESEND_FROM,
-                "to": self._to_email,
-                "subject": subject,
-                "html": html,
-            })
+            self._resend.Emails.send(
+                {
+                    "from": RESEND_FROM,
+                    "to": self._to_email,
+                    "subject": subject,
+                    "html": html,
+                }
+            )
             logger.info(f"Email sent to {self._to_email}: {subject}")
             return True
         except Exception as e:
@@ -126,7 +130,8 @@ class EmailNotifier:
 
         subject = (
             f"⚠️ Adventure Tracker falló · {error_count} error{'es' if error_count != 1 else ''} "
-            f"· {now.strftime('%d %b %Y')}"        )
+            f"· {now.strftime('%d %b %Y')}"
+        )
 
         html = _build_error_html(
             errors=errors,
@@ -167,10 +172,23 @@ _EVENT_COLORS = ["#e65100", "#7b1fa2", "#0277bd", "#2d6a4f", "#c62828", "#00695c
 
 # Emojis by keyword match (best-effort)
 _EVENT_EMOJIS = {
-    "salto": "🧗", "canyoning": "💦", "torrentismo": "💦", "rafting": "🌊",
-    "nocturno": "🌙", "río": "🏞", "rio": "🏞", "paramo": "🌿", "páramo": "🌿",
-    "nevado": "🏔", "bosque": "🌲", "caverna": "🕳", "ciclismo": "🚵",
-    "playa": "🏖", "isla": "🏝", "mar": "⛵", "pueblo": "🏘",
+    "salto": "🧗",
+    "canyoning": "💦",
+    "torrentismo": "💦",
+    "rafting": "🌊",
+    "nocturno": "🌙",
+    "río": "🏞",
+    "rio": "🏞",
+    "paramo": "🌿",
+    "páramo": "🌿",
+    "nevado": "🏔",
+    "bosque": "🌲",
+    "caverna": "🕳",
+    "ciclismo": "🚵",
+    "playa": "🏖",
+    "isla": "🏝",
+    "mar": "⛵",
+    "pueblo": "🏘",
 }
 
 
@@ -190,7 +208,8 @@ def _build_html(pairs: list) -> str:
     all_dates = [p.outbound.travel_date for p in pairs]
     date_range = (
         f"{min(all_dates).strftime('%d %b')}–{max(all_dates).strftime('%d %b %Y')}"
-        if all_dates else ""
+        if all_dates
+        else ""
     )
 
     pair_sections = ""
@@ -325,14 +344,18 @@ def _build_html(pairs: list) -> str:
         else:
             event_rows = "<p style='font-size:13px;color:#aaa;font-family:Arial,sans-serif;font-style:italic;'>Sin eventos confirmados para estas fechas.</p>"
 
-        divider = '<hr style="border:none;border-top:2px dashed #d8f3dc;margin:32px 0;">' if idx < n - 1 else ""
+        divider = (
+            '<hr style="border:none;border-top:2px dashed #d8f3dc;margin:32px 0;">'
+            if idx < n - 1
+            else ""
+        )
 
         pair_sections += f"""
-        <!-- WEEKEND {idx+1} -->
+        <!-- WEEKEND {idx + 1} -->
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
           <tr>
             <td style="border-left:4px solid #2d6a4f;padding-left:14px;">
-              <div style="font-size:11px;color:#888;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Finde {idx+1} de {n}</div>
+              <div style="font-size:11px;color:#888;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Finde {idx + 1} de {n}</div>
               <div style="font-size:20px;color:#1b4332;font-weight:400;">📅 {label}</div>
             </td>
           </tr>
@@ -499,14 +522,18 @@ def _build_html(pairs: list) -> str:
             event_rows = "<p style='font-size:13px;color:#aaa;font-family:Arial,sans-serif;font-style:italic;'>Sin eventos confirmados para estas fechas.</p>"
 
         # Divider between weekends (not after last one)
-        divider = '<hr style="border:none;border-top:2px dashed #d8f3dc;margin:32px 0;">' if idx < len(weekends) - 1 else ""
+        divider = (
+            '<hr style="border:none;border-top:2px dashed #d8f3dc;margin:32px 0;">'
+            if idx < len(weekends) - 1
+            else ""
+        )
 
         weekend_sections += f"""
-        <!-- WEEKEND {idx+1} -->
+        <!-- WEEKEND {idx + 1} -->
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
           <tr>
             <td style="border-left:4px solid #2d6a4f;padding-left:14px;">
-              <div style="font-size:11px;color:#888;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Finde {idx+1} de {n}</div>
+              <div style="font-size:11px;color:#888;font-family:Arial,sans-serif;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Finde {idx + 1} de {n}</div>
               <div style="font-size:20px;color:#1b4332;font-weight:400;">📅 {label}</div>
             </td>
           </tr>
@@ -740,6 +767,7 @@ def _build_html(pairs: list) -> str:
 # Error report HTML builder — Tropical style
 # ---------------------------------------------------------------------------
 
+
 def _build_error_html(
     errors: list[str],
     mode: str,
@@ -810,10 +838,14 @@ def _build_error_html(
                 message = parts[1].strip()
 
         module_html = (
-            f'<div style="font-size:11px;color:{label_color};font-family:Arial,sans-serif;'
-            f'font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">'
-            f'{module}</div>'
-        ) if module else ""
+            (
+                f'<div style="font-size:11px;color:{label_color};font-family:Arial,sans-serif;'
+                f'font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">'
+                f"{module}</div>"
+            )
+            if module
+            else ""
+        )
 
         error_rows += f"""
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;background:#fff;border-radius:8px;border-left:4px solid {border_color};">
@@ -865,7 +897,7 @@ def _build_error_html(
   <tr><td style="background:linear-gradient(180deg,#7f1d1d 0%,#991b1b 50%,#b91c1c 100%);padding:48px 40px 36px;text-align:center;">
     <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
     <h1 style="margin:0 0 6px;font-size:32px;font-weight:400;color:#ffffff;font-style:italic;">Algo salió mal</h1>
-    <p style="margin:0 0 24px;font-size:15px;color:#fca5a5;font-family:Arial,sans-serif;">El tracker encontró {error_count} error{'es' if error_count != 1 else ''} durante la ejecución</p>
+    <p style="margin:0 0 24px;font-size:15px;color:#fca5a5;font-family:Arial,sans-serif;">El tracker encontró {error_count} error{"es" if error_count != 1 else ""} durante la ejecución</p>
     <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
       <tr><td style="background:rgba(0,0,0,0.25);border-radius:50px;padding:8px 24px;">
         <span style="font-size:13px;color:#fecaca;font-family:Arial,sans-serif;font-weight:600;">🕐 {generated_at}</span>

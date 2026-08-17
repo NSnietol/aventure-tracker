@@ -9,7 +9,6 @@ import requests
 
 from aventure_tracker.infrastructure.notifier import (
     MAX_MESSAGES_PER_MINUTE,
-    RateLimitExceeded,
     TelegramNotifier,
 )
 

@@ -2,7 +2,6 @@
 
 import argparse
 import os
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -200,9 +199,7 @@ class TestOrchestratorRun:
         with patch.object(
             orchestrator, "_init_infrastructure", new_callable=AsyncMock
         ) as mock_init:
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 with patch(
                     "aventure_tracker.main.ActivityTrackerService"
                 ) as mock_activity_cls:
@@ -237,12 +234,8 @@ class TestOrchestratorRun:
             mode=RunMode.FLIGHTS,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 mock_flight = AsyncMock()
                 mock_flight.track_flights = AsyncMock(return_value=mock_flight_result)
                 mock_flight_cls.return_value = mock_flight
@@ -266,9 +259,7 @@ class TestOrchestratorRun:
             mode=RunMode.ACTIVITIES,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
             with patch(
                 "aventure_tracker.main.ActivityTrackerService"
             ) as mock_activity_cls:
@@ -296,12 +287,8 @@ class TestOrchestratorRun:
             mode=RunMode.FLIGHTS,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 mock_flight = AsyncMock()
                 mock_flight.track_flights = AsyncMock(
                     side_effect=Exception("Scraper error")
@@ -324,12 +311,8 @@ class TestOrchestratorRun:
             mode=RunMode.FLIGHTS,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 mock_flight = AsyncMock()
                 mock_flight.track_flights = AsyncMock(
                     return_value=FlightTrackerResult(
@@ -551,9 +534,7 @@ class TestInitInfrastructure:
         orchestrator = AdventureOrchestrator(settings=mock_settings)
 
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
-            with patch(
-                "aventure_tracker.main.StateManager"
-            ) as mock_state_cls:
+            with patch("aventure_tracker.main.StateManager") as mock_state_cls:
                 mock_state = MagicMock()
                 mock_state.read = MagicMock()
                 mock_state_cls.return_value = mock_state

@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from aventure_tracker.models.activity import (
-    AccountsConfig,
     InstagramAccountConfig,
     InstagramPost,
 )
@@ -684,7 +683,6 @@ class TestActivityTrackerResultDataclass:
         assert result.errors == []
 
 
-
 class TestActivityAlertWithEventInfo:
     """Tests for ActivityAlert with event information."""
 
@@ -893,9 +891,7 @@ class TestHistoryIntegration:
         assert stats["skipped"] == 1
         assert stats["active"] == 2
 
-    def test_get_account_history_stats_no_manager(
-        self, accounts_config: Path
-    ) -> None:
+    def test_get_account_history_stats_no_manager(self, accounts_config: Path) -> None:
         """Test history stats without manager returns zeros."""
         service = ActivityTrackerService(accounts_config_path=accounts_config)
 

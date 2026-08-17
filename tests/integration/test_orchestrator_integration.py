@@ -5,7 +5,7 @@ Run with: pytest tests/integration -v -m integration
 """
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -115,9 +115,7 @@ class TestOrchestratorIntegration:
         )
 
         # Mock both trackers
-        with patch(
-            "aventure_tracker.main.FlightTrackerService"
-        ) as mock_flight_cls:
+        with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
             with patch(
                 "aventure_tracker.main.ActivityTrackerService"
             ) as mock_activity_cls:
@@ -174,9 +172,7 @@ class TestOrchestratorIntegration:
             weeks_ahead=4,
         )
 
-        with patch(
-            "aventure_tracker.main.FlightTrackerService"
-        ) as mock_flight_cls:
+        with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
             mock_flight = AsyncMock()
             mock_flight.track_flights = AsyncMock(
                 return_value=FlightTrackerResult(
@@ -210,9 +206,7 @@ class TestOrchestratorIntegration:
             mode=RunMode.ACTIVITIES,
         )
 
-        with patch(
-            "aventure_tracker.main.ActivityTrackerService"
-        ) as mock_activity_cls:
+        with patch("aventure_tracker.main.ActivityTrackerService") as mock_activity_cls:
             mock_activity = AsyncMock()
             mock_activity.track_activities = AsyncMock(
                 return_value=ActivityTrackerResult(
@@ -245,9 +239,7 @@ class TestOrchestratorIntegration:
             mode=RunMode.ALL,
         )
 
-        with patch(
-            "aventure_tracker.main.FlightTrackerService"
-        ) as mock_flight_cls:
+        with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
             with patch(
                 "aventure_tracker.main.ActivityTrackerService"
             ) as mock_activity_cls:

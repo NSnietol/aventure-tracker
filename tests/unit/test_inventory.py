@@ -63,9 +63,7 @@ class TestLoadConfigs:
         assert len(manager.destinations.get_all_blacklisted()) == 6
         assert "guatapé" in manager.destinations.get_all_blacklisted()
 
-    def test_lazy_load_on_property_access(
-        self, destinations_config: Path
-    ) -> None:
+    def test_lazy_load_on_property_access(self, destinations_config: Path) -> None:
         """Test that config is lazily loaded on property access."""
         manager = InventoryManager(destinations_path=destinations_config)
         assert manager._destinations is None
@@ -132,7 +130,7 @@ class TestMatchActivity:
             confidence=0.8,
         )
         result = manager.match_activity(extracted)
-        
+
         assert result.is_blacklisted is True
         assert result.matched_blacklist == "Guatapé"
         assert result.blacklist_reason == "ya_fue"
@@ -147,7 +145,7 @@ class TestMatchActivity:
             confidence=0.9,
         )
         result = manager.match_activity(extracted)
-        
+
         assert result.is_blacklisted is False
         assert result.should_notify is True
         assert result.match_score == 0.9  # Uses confidence
@@ -170,7 +168,7 @@ class TestMatchPost:
             location="Guatapé",
             confidence=0.7,
         )
-        
+
         result = manager.match_post(post, extracted)
         assert result.is_blacklisted is True
         assert result.should_notify is False
@@ -184,7 +182,7 @@ class TestMatchPost:
             caption="Plan a Tatacoa este puente",
             timestamp=datetime.now(),
         )
-        
+
         result = manager.match_post(post)
         assert result.is_blacklisted is True
         assert result.matched_blacklist == "Tatacoa"
@@ -198,7 +196,7 @@ class TestMatchPost:
             caption="Aventura en Ciudad Perdida",
             timestamp=datetime.now(),
         )
-        
+
         result = manager.match_post(post)
         assert result.is_blacklisted is False
         assert result.should_notify is True
@@ -226,7 +224,7 @@ class TestSave:
         """Test saving destinations config."""
         manager.add_to_blacklist("Nuevo Destino", "ya_fue")
         manager.save()
-        
+
         # Reload and verify
         manager2 = InventoryManager(destinations_path=manager._destinations_path)
         assert "nuevo destino" in manager2.destinations.get_all_blacklisted()
@@ -238,7 +236,7 @@ class TestGetStats:
     def test_get_stats(self, manager: InventoryManager) -> None:
         """Test getting inventory statistics."""
         stats = manager.get_stats()
-        
+
         assert stats["blacklist_count"] == 6
         assert stats["ya_fue_count"] == 3
         assert stats["playa_count"] == 2
@@ -273,18 +271,16 @@ class TestFilterNewActivities:
                 timestamp=datetime.now(),
             ),
         ]
-        
+
         results = manager.filter_new_activities(posts)
-        
+
         # Should return 2 posts (San Gil and Bogotá), excluding Guatapé
         assert len(results) == 2
         captions = [post.caption for post, _ in results]
         assert "Tour Guatapé" not in captions
         assert "Aventura en San Gil" in captions
 
-    def test_filter_with_extracted_activities(
-        self, manager: InventoryManager
-    ) -> None:
+    def test_filter_with_extracted_activities(self, manager: InventoryManager) -> None:
         """Test filter with extracted activity info."""
         posts = [
             InstagramPost(
@@ -302,7 +298,7 @@ class TestFilterNewActivities:
                 confidence=0.8,
             )
         }
-        
+
         results = manager.filter_new_activities(posts, extracted)
         assert len(results) == 0  # Should be filtered out
 
@@ -318,7 +314,7 @@ class TestMatchResultDataclass:
             blacklist_reason="ya_fue",
             match_score=0.8,
         )
-        
+
         assert result.is_blacklisted is True
         assert result.matched_blacklist == "Guatapé"
         assert result.should_notify is False
@@ -326,7 +322,7 @@ class TestMatchResultDataclass:
     def test_match_result_defaults(self) -> None:
         """Test MatchResult default values."""
         result = MatchResult()
-        
+
         assert result.is_blacklisted is False
         assert result.matched_blacklist is None
         assert result.blacklist_reason is None

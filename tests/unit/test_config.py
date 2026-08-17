@@ -4,8 +4,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from aventure_tracker.config import Settings
 
 
@@ -52,7 +50,7 @@ class TestSettings:
                 gist_token="t",
             )
             assert settings.is_ci is True
-        
+
         # Without GITHUB_ACTIONS, is_ci should be False even with CI=true
         with patch.dict(os.environ, {"CI": "true", "GITHUB_ACTIONS": ""}, clear=False):
             settings = Settings()

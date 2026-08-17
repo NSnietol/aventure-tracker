@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     )
 
     # Environment detection
-    ci: bool = Field(default=False, description="CI environment flag (set by GitHub Actions)")
+    ci: bool = Field(
+        default=False, description="CI environment flag (set by GitHub Actions)"
+    )
     app_env: str = Field(default="local", description="Application environment")
 
     # Telegram configuration
@@ -116,7 +118,7 @@ class Settings(BaseSettings):
     @property
     def is_ci(self) -> bool:
         """Check if running in CI environment (GitHub Actions).
-        
+
         Uses GITHUB_ACTIONS which is ONLY set by GitHub Actions runner,
         never in local development.
         """

@@ -1,14 +1,14 @@
 """Tests for file organizer service."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from aventure_tracker.services.file_organizer import (
     FileOrganizer,
     detect_file_type,
-    normalize_agency_name,
     get_month_number,
-    OrganizedFile,
+    normalize_agency_name,
 )
 
 
@@ -268,9 +268,7 @@ class TestFileOrganizer:
         files = organizer.list_organized_files()
         assert files == []
 
-    def test_skips_hidden_files(
-        self, organizer: FileOrganizer, tmp_path: Path
-    ) -> None:
+    def test_skips_hidden_files(self, organizer: FileOrganizer, tmp_path: Path) -> None:
         """Should skip hidden files like .DS_Store."""
         source_dir = tmp_path / "source"
         agency_dir = source_dir / "brutal"

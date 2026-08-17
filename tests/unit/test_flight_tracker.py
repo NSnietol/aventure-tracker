@@ -1,12 +1,12 @@
 """Tests for Flight Tracker Service."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from aventure_tracker.models.flight import FlightResult, RouteConfig, RoutesConfig
+from aventure_tracker.models.flight import FlightResult, RouteConfig
 from aventure_tracker.services.flight_tracker import (
     FlightFound,
     FlightTrackerResult,
@@ -86,17 +86,19 @@ def mock_scraper() -> AsyncMock:
     """Create a mock scraper."""
     scraper = AsyncMock()
     # scrape() returns a list of FlightResult objects
-    scraper.scrape = AsyncMock(return_value=[
-        FlightResult(
-            price=120000,
-            airline="LATAM",
-            departure_time=datetime(2025, 3, 15, 18, 30),
-            arrival_time=datetime(2025, 3, 15, 19, 45),
-            duration=timedelta(hours=1, minutes=15),
-            stops=0,
-            booking_link="https://example.com/flight",
-        )
-    ])
+    scraper.scrape = AsyncMock(
+        return_value=[
+            FlightResult(
+                price=120000,
+                airline="LATAM",
+                departure_time=datetime(2025, 3, 15, 18, 30),
+                arrival_time=datetime(2025, 3, 15, 19, 45),
+                duration=timedelta(hours=1, minutes=15),
+                stops=0,
+                booking_link="https://example.com/flight",
+            )
+        ]
+    )
     return scraper
 
 
@@ -388,7 +390,9 @@ class TestTrackFlights:
             FlightResult(
                 price=100000,  # Below 150000 threshold
                 airline="LATAM",
-                departure_time=datetime(2025, 3, 14, 18, 30),  # Thursday 6:30 PM (valid time)
+                departure_time=datetime(
+                    2025, 3, 14, 18, 30
+                ),  # Thursday 6:30 PM (valid time)
                 arrival_time=datetime(2025, 3, 14, 19, 45),
                 duration=timedelta(hours=1, minutes=15),
                 stops=0,

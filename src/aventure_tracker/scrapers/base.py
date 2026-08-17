@@ -196,7 +196,9 @@ class BaseScraper(ABC):
         else:
             global _stealth_warning_shown
             if not _stealth_warning_shown:
-                logger.warning("playwright_stealth not available, running without stealth")
+                logger.warning(
+                    "playwright_stealth not available, running without stealth"
+                )
                 _stealth_warning_shown = True
 
         # Start trace recording if enabled

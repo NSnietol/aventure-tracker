@@ -1,16 +1,17 @@
 """Tests for weekend pairing logic in AdventureOrchestrator."""
 
-import pytest
 from datetime import date, timedelta
 from unittest.mock import MagicMock
 
-from aventure_tracker.services.flight_tracker import FlightFound, WeekendPair, ReturnOption
 from aventure_tracker.main import AdventureOrchestrator
-
+from aventure_tracker.services.flight_tracker import (
+    FlightFound,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_flight(
     route: str,
@@ -31,7 +32,9 @@ def make_flight(
     )
 
 
-def make_event(name: str, date_start: date, date_end: date | None = None, price: int = 150_000):
+def make_event(
+    name: str, date_start: date, date_end: date | None = None, price: int = 150_000
+):
     ev = MagicMock()
     ev.name = name
     ev.date_start = date_start
@@ -46,6 +49,7 @@ def make_event(name: str, date_start: date, date_end: date | None = None, price:
 def make_orchestrator() -> AdventureOrchestrator:
     """Create a minimal orchestrator for testing static/helper methods."""
     from aventure_tracker.config import Settings
+
     orch = AdventureOrchestrator.__new__(AdventureOrchestrator)
     orch._settings = Settings()
     orch._logger = MagicMock()
@@ -57,6 +61,7 @@ def make_orchestrator() -> AdventureOrchestrator:
 # ---------------------------------------------------------------------------
 # _has_sunday_events tests
 # ---------------------------------------------------------------------------
+
 
 class TestHasSundayEvents:
     """Tests for the Sunday-adventure detection helper."""
@@ -75,7 +80,11 @@ class TestHasSundayEvents:
 
     def test_event_spanning_sunday_returns_true(self) -> None:
         sunday = self._sunday()
-        events = [make_event("Tatacoa", sunday - timedelta(days=1), sunday + timedelta(days=1))]
+        events = [
+            make_event(
+                "Tatacoa", sunday - timedelta(days=1), sunday + timedelta(days=1)
+            )
+        ]
         result = AdventureOrchestrator._has_sunday_events(
             events, sunday - timedelta(days=3), sunday + timedelta(days=1)
         )
@@ -111,14 +120,15 @@ class TestHasSundayEvents:
 # _build_weekend_pairs tests
 # ---------------------------------------------------------------------------
 
+
 class TestBuildWeekendPairs:
     """Tests for the pairing logic."""
 
     # Base dates for a Thu-Mon window
-    THU = date(2026, 8, 20)   # Thursday
-    FRI = date(2026, 8, 21)   # Friday
-    SUN = date(2026, 8, 23)   # Sunday
-    MON = date(2026, 8, 24)   # Monday
+    THU = date(2026, 8, 20)  # Thursday
+    FRI = date(2026, 8, 21)  # Friday
+    SUN = date(2026, 8, 23)  # Sunday
+    MON = date(2026, 8, 24)  # Monday
 
     def test_basic_pair_with_return(self) -> None:
         orch = make_orchestrator()
@@ -150,8 +160,12 @@ class TestBuildWeekendPairs:
     def test_sunday_adventure_filters_sunday_returns(self) -> None:
         orch = make_orchestrator()
         outbound = [make_flight("BAQ→MDE", self.THU, "18:30", "LATAM", 250_000, True)]
-        sunday_return = make_flight("MDE→BAQ", self.SUN, "16:45", "LATAM", 280_000, True)
-        monday_return = make_flight("MDE→BAQ", self.MON, "07:00", "LATAM", 290_000, True)
+        sunday_return = make_flight(
+            "MDE→BAQ", self.SUN, "16:45", "LATAM", 280_000, True
+        )
+        monday_return = make_flight(
+            "MDE→BAQ", self.MON, "07:00", "LATAM", 290_000, True
+        )
 
         sunday_event = make_event("Canyoning", self.SUN)
 
@@ -159,7 +173,9 @@ class TestBuildWeekendPairs:
         match.window_start = self.THU
         match.events = [sunday_event]
 
-        pairs = orch._build_weekend_pairs(outbound, [sunday_return, monday_return], [match])
+        pairs = orch._build_weekend_pairs(
+            outbound, [sunday_return, monday_return], [match]
+        )
         assert pairs[0].sunday_adventure is True
         # Sunday return must be filtered out
         return_dates = [ro.flight.travel_date for ro in pairs[0].return_options]
@@ -169,7 +185,9 @@ class TestBuildWeekendPairs:
     def test_no_sunday_adventure_allows_sunday_returns(self) -> None:
         orch = make_orchestrator()
         outbound = [make_flight("BAQ→MDE", self.THU)]
-        sunday_return = make_flight("MDE→BAQ", self.SUN, "14:00", "LATAM", 280_000, True)
+        sunday_return = make_flight(
+            "MDE→BAQ", self.SUN, "14:00", "LATAM", 280_000, True
+        )
         saturday_event = make_event("Trek", self.FRI)  # Saturday, not Sunday
 
         match = MagicMock()
@@ -192,7 +210,9 @@ class TestBuildWeekendPairs:
         match.window_start = self.THU
         match.events = []
 
-        pairs = orch._build_weekend_pairs(outbound, [early_return, late_return], [match])
+        pairs = orch._build_weekend_pairs(
+            outbound, [early_return, late_return], [match]
+        )
         times = [ro.flight.departure_time for ro in pairs[0].return_options]
         assert "09:00" not in times
         assert "15:00" in times
@@ -202,14 +222,18 @@ class TestBuildWeekendPairs:
         orch = make_orchestrator()
         outbound = [make_flight("BAQ→MDE", self.THU, is_priority=True)]
         latam_return = make_flight("MDE→BAQ", self.SUN, "16:45", "LATAM", 280_000, True)
-        wingo_return = make_flight("MDE→BAQ", self.SUN, "17:00", "Wingo", 220_000, False)
+        wingo_return = make_flight(
+            "MDE→BAQ", self.SUN, "17:00", "Wingo", 220_000, False
+        )
         # Savings = 280K - 220K = 60K → NOT enough (< 100K) → LATAM preferred
 
         match = MagicMock()
         match.window_start = self.THU
         match.events = []
 
-        pairs = orch._build_weekend_pairs(outbound, [latam_return, wingo_return], [match])
+        pairs = orch._build_weekend_pairs(
+            outbound, [latam_return, wingo_return], [match]
+        )
         assert pairs[0].recommended_return.flight.airline == "LATAM"
 
     def test_non_priority_wins_when_100k_cheaper(self) -> None:
@@ -217,14 +241,18 @@ class TestBuildWeekendPairs:
         orch = make_orchestrator()
         outbound = [make_flight("BAQ→MDE", self.THU, is_priority=True)]
         latam_return = make_flight("MDE→BAQ", self.SUN, "16:45", "LATAM", 280_000, True)
-        wingo_return = make_flight("MDE→BAQ", self.SUN, "17:00", "Wingo", 170_000, False)
+        wingo_return = make_flight(
+            "MDE→BAQ", self.SUN, "17:00", "Wingo", 170_000, False
+        )
         # Savings = 280K - 170K = 110K → enough → Wingo recommended
 
         match = MagicMock()
         match.window_start = self.THU
         match.events = []
 
-        pairs = orch._build_weekend_pairs(outbound, [latam_return, wingo_return], [match])
+        pairs = orch._build_weekend_pairs(
+            outbound, [latam_return, wingo_return], [match]
+        )
         assert pairs[0].recommended_return.flight.airline == "Wingo"
 
     def test_top_3_return_options(self) -> None:

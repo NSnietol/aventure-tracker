@@ -1,9 +1,8 @@
 """Tests for flight price store."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
-import pytest
 import yaml
 
 from aventure_tracker.services.flight_price_store import (
@@ -65,7 +64,9 @@ class TestFlightPriceStore:
 
         store1 = FlightPriceStore(path=path)
         store1.set_flight_price("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM", 150000)
-        store1.set_flight_price("CTG-MDE", date(2026, 8, 22), "09:00", "Avianca", 180000)
+        store1.set_flight_price(
+            "CTG-MDE", date(2026, 8, 22), "09:00", "Avianca", 180000
+        )
         store1.save()
 
         store2 = FlightPriceStore(path=path)

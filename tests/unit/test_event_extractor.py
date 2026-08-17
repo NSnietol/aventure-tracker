@@ -3,8 +3,6 @@
 from datetime import date
 from unittest.mock import patch
 
-import pytest
-
 from aventure_tracker.services.event_extractor import (
     EventInfo,
     _clean_event_name,
