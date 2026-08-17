@@ -8,6 +8,33 @@ from unittest.mock import patch
 import pytest
 
 
+# ---------------------------------------------------------------------------
+# SAFETY: Block real credentials in all tests
+# ---------------------------------------------------------------------------
+# pydantic-settings loads .env automatically — this autouse fixture overrides
+# all sensitive keys with empty strings so no test can accidentally send a
+# real email, call a real API, or connect to GitHub Gist.
+@pytest.fixture(autouse=True)
+def _block_real_credentials() -> Generator[None, None, None]:
+    """Override all real credentials with empty values for every test.
+
+    This prevents accidental API calls (Resend emails, GitHub Gist, etc.)
+    when tests create Settings() without explicit mocking.
+    """
+    safe_overrides = {
+        "RESEND_API_KEY": "",
+        "EMAIL_TO": "",
+        "GEMINI_API_KEY": "",
+        "TELEGRAM_BOT_TOKEN": "",
+        "TELEGRAM_CHAT_ID": "",
+        "GITHUB_GIST_ID": "",
+        "GITHUB_GIST_TOKEN": "",
+        "GITHUB_ACTIONS": "",  # prevent is_ci=True in non-CI tests
+    }
+    with patch.dict(os.environ, safe_overrides, clear=False):
+        yield
+
+
 @pytest.fixture
 def temp_config_dir(tmp_path: Path) -> Path:
     """Create a temporary config directory with sample files."""
