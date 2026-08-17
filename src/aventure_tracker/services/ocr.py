@@ -1,5 +1,7 @@
 """OCR processor for extracting text from images using Tesseract."""
 
+from __future__ import annotations
+
 import logging
 import re
 from dataclasses import dataclass
