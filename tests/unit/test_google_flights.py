@@ -1,11 +1,11 @@
 """Tests for Google Flights Scraper."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from aventure_tracker.models.flight import FlightResult, RouteConfig
+from aventure_tracker.models.flight import RouteConfig
 from aventure_tracker.scrapers.google_flights import GoogleFlightsScraper
 from aventure_tracker.scrapers.google_flights.locators import (
     BASE_URL,
@@ -152,9 +152,7 @@ class TestCreateFlightResult:
             "stops": 0,
         }
 
-        result = scraper._create_flight_result(
-            data, route, date(2025, 3, 15)
-        )
+        result = scraper._create_flight_result(data, route, date(2025, 3, 15))
 
         assert result is not None
         assert result.price == 120000
@@ -172,9 +170,7 @@ class TestCreateFlightResult:
             "stops": 0,
         }
 
-        result = scraper._create_flight_result(
-            data, route, date(2025, 3, 15)
-        )
+        result = scraper._create_flight_result(data, route, date(2025, 3, 15))
 
         assert result is None
 
@@ -184,9 +180,7 @@ class TestCreateFlightResult:
         """Test creating result with default values."""
         data = {"price": 150000}
 
-        result = scraper._create_flight_result(
-            data, route, date(2025, 3, 15)
-        )
+        result = scraper._create_flight_result(data, route, date(2025, 3, 15))
 
         assert result is not None
         assert result.price == 150000
@@ -211,9 +205,7 @@ class TestConsentHandler:
         mock_button.click.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_dismiss_consent_when_not_present(
-        self, mock_page: AsyncMock
-    ) -> None:
+    async def test_dismiss_consent_when_not_present(self, mock_page: AsyncMock) -> None:
         """Test handling when consent is not present."""
         mock_page.query_selector.return_value = None
 
@@ -340,16 +332,12 @@ class TestScrapeIntegration:
         mock_page.query_selector = AsyncMock(return_value=None)
         mock_page.query_selector_all = AsyncMock(return_value=[])
 
-        with patch.object(
-            scraper, "browser_session"
-        ) as mock_session:
+        with patch.object(scraper, "browser_session") as mock_session:
             mock_session.return_value.__aenter__.return_value = mock_page
             mock_session.return_value.__aexit__.return_value = None
 
             with patch.object(scraper, "navigate", new_callable=AsyncMock):
-                with patch.object(
-                    scraper, "_add_human_delay", new_callable=AsyncMock
-                ):
+                with patch.object(scraper, "_add_human_delay", new_callable=AsyncMock):
                     # Mock ResultsPage methods
                     with patch(
                         "aventure_tracker.scrapers.google_flights.scraper.ResultsPage"
@@ -375,9 +363,7 @@ class TestScrapeIntegration:
                                 AsyncMock(return_value=False)
                             )
 
-                            results = await scraper.scrape(
-                                route, date(2025, 3, 15)
-                            )
+                            results = await scraper.scrape(route, date(2025, 3, 15))
 
                             assert len(results) == 1
                             assert results[0].price == 120000
@@ -397,17 +383,13 @@ class TestScrapeIntegration:
             mock_session.return_value.__aexit__.return_value = None
 
             with patch.object(scraper, "navigate", new_callable=AsyncMock):
-                with patch.object(
-                    scraper, "_add_human_delay", new_callable=AsyncMock
-                ):
+                with patch.object(scraper, "_add_human_delay", new_callable=AsyncMock):
                     with patch(
                         "aventure_tracker.scrapers.google_flights.scraper.ResultsPage"
                     ) as MockResultsPage:
                         mock_results = AsyncMock()
                         mock_results.wait_for_results = AsyncMock(return_value=True)
-                        mock_results.get_cheapest_price = AsyncMock(
-                            return_value=99000
-                        )
+                        mock_results.get_cheapest_price = AsyncMock(return_value=99000)
                         MockResultsPage.return_value = mock_results
 
                         with patch(

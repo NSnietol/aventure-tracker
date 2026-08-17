@@ -66,12 +66,6 @@ class ElementNotFoundError(ScraperError):
     pass
 
 
-class ScraperTimeoutError(ScraperError):
-    """Timeout during scraping operation."""
-
-    pass
-
-
 class BaseScraper(ABC):
     """Base class for all scrapers with Playwright stealth support.
 
@@ -202,7 +196,9 @@ class BaseScraper(ABC):
         else:
             global _stealth_warning_shown
             if not _stealth_warning_shown:
-                logger.warning("playwright_stealth not available, running without stealth")
+                logger.warning(
+                    "playwright_stealth not available, running without stealth"
+                )
                 _stealth_warning_shown = True
 
         # Start trace recording if enabled

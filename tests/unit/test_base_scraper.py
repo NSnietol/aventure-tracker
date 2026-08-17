@@ -95,7 +95,6 @@ class TestHumanDelay:
     @pytest.mark.asyncio
     async def test_add_human_delay(self, scraper: ConcreteScraper) -> None:
         """Test human delay is applied."""
-        import asyncio
         import time
 
         start = time.time()
@@ -112,9 +111,7 @@ class TestNavigationWithoutPage:
     """Tests for methods that require page to be initialized."""
 
     @pytest.mark.asyncio
-    async def test_navigate_without_page_raises(
-        self, scraper: ConcreteScraper
-    ) -> None:
+    async def test_navigate_without_page_raises(self, scraper: ConcreteScraper) -> None:
         """Test navigate raises when page not initialized."""
         with pytest.raises(ScraperError, match="Page not initialized"):
             await scraper.navigate("https://example.com")
@@ -128,9 +125,7 @@ class TestNavigationWithoutPage:
             await scraper.wait_for_selector("div")
 
     @pytest.mark.asyncio
-    async def test_click_without_page_raises(
-        self, scraper: ConcreteScraper
-    ) -> None:
+    async def test_click_without_page_raises(self, scraper: ConcreteScraper) -> None:
         """Test click raises when page not initialized."""
         with pytest.raises(ScraperError, match="Page not initialized"):
             await scraper.click("button")
@@ -144,9 +139,7 @@ class TestNavigationWithoutPage:
             await scraper.type_text("input", "text")
 
     @pytest.mark.asyncio
-    async def test_get_text_without_page_raises(
-        self, scraper: ConcreteScraper
-    ) -> None:
+    async def test_get_text_without_page_raises(self, scraper: ConcreteScraper) -> None:
         """Test get_text raises when page not initialized."""
         with pytest.raises(ScraperError, match="Page not initialized"):
             await scraper.get_text("span")

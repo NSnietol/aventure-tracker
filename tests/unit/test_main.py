@@ -2,7 +2,6 @@
 
 import argparse
 import os
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -200,9 +199,7 @@ class TestOrchestratorRun:
         with patch.object(
             orchestrator, "_init_infrastructure", new_callable=AsyncMock
         ) as mock_init:
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 with patch(
                     "aventure_tracker.main.ActivityTrackerService"
                 ) as mock_activity_cls:
@@ -237,12 +234,8 @@ class TestOrchestratorRun:
             mode=RunMode.FLIGHTS,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 mock_flight = AsyncMock()
                 mock_flight.track_flights = AsyncMock(return_value=mock_flight_result)
                 mock_flight_cls.return_value = mock_flight
@@ -266,9 +259,7 @@ class TestOrchestratorRun:
             mode=RunMode.ACTIVITIES,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
             with patch(
                 "aventure_tracker.main.ActivityTrackerService"
             ) as mock_activity_cls:
@@ -296,12 +287,8 @@ class TestOrchestratorRun:
             mode=RunMode.FLIGHTS,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 mock_flight = AsyncMock()
                 mock_flight.track_flights = AsyncMock(
                     side_effect=Exception("Scraper error")
@@ -324,12 +311,8 @@ class TestOrchestratorRun:
             mode=RunMode.FLIGHTS,
         )
 
-        with patch.object(
-            orchestrator, "_init_infrastructure", new_callable=AsyncMock
-        ):
-            with patch(
-                "aventure_tracker.main.FlightTrackerService"
-            ) as mock_flight_cls:
+        with patch.object(orchestrator, "_init_infrastructure", new_callable=AsyncMock):
+            with patch("aventure_tracker.main.FlightTrackerService") as mock_flight_cls:
                 mock_flight = AsyncMock()
                 mock_flight.track_flights = AsyncMock(
                     return_value=FlightTrackerResult(
@@ -548,28 +531,28 @@ class TestInitInfrastructure:
     @pytest.mark.asyncio
     async def test_init_with_credentials_in_ci(self, mock_settings: Settings) -> None:
         """Test initialization with valid credentials in CI environment."""
-        orchestrator = AdventureOrchestrator(settings=mock_settings)
+        with patch("aventure_tracker.main.StateManager") as mock_state_cls:
+            mock_state = MagicMock()
+            mock_state.read = MagicMock(return_value=None)
+            mock_state_cls.return_value = mock_state
 
-        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
-            with patch(
-                "aventure_tracker.main.StateManager"
-            ) as mock_state_cls:
-                mock_state = MagicMock()
-                mock_state.read = MagicMock()
-                mock_state_cls.return_value = mock_state
-
-                # Re-create orchestrator inside patch context so is_ci returns True
-                mock_settings_ci = Settings(
-                    config_dir=mock_settings.config_dir,
-                    gist_id="valid_gist",
-                    gist_token="valid_token",
-                )
+            # Settings uses aliases GITHUB_GIST_ID / GITHUB_GIST_TOKEN, not field names.
+            # Set all three via env vars so pydantic-settings picks them up correctly.
+            with patch.dict(
+                os.environ,
+                {
+                    "GITHUB_ACTIONS": "true",
+                    "GITHUB_GIST_ID": "valid_gist",
+                    "GITHUB_GIST_TOKEN": "valid_token",
+                },
+                clear=False,
+            ):
+                mock_settings_ci = Settings(config_dir=mock_settings.config_dir)
                 orchestrator = AdventureOrchestrator(settings=mock_settings_ci)
                 await orchestrator._init_infrastructure()
 
-            # Check infrastructure was created (only in CI)
-            assert orchestrator._state_manager is not None
-            mock_state.read.assert_called_once()
+        assert orchestrator._state_manager is not None
+        mock_state.read.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_init_without_credentials(self, tmp_path: Path) -> None:

@@ -12,7 +12,7 @@ from aventure_tracker.scrapers.base import BaseScraper, ScraperError
 # Try to import instaloader
 try:
     import instaloader
-    from instaloader import Profile, Post
+    from instaloader import Post, Profile
 
     INSTALOADER_AVAILABLE = True
 except ImportError:
@@ -173,7 +173,9 @@ class InstagramScraper(BaseScraper):
                 posts.append(instagram_post)
                 count += 1
 
-            logger.info(f"Instaloader: found {len(posts)} posts for @{account.username}")
+            logger.info(
+                f"Instaloader: found {len(posts)} posts for @{account.username}"
+            )
 
         except instaloader.exceptions.ProfileNotExistsException:
             raise InstagramScraperError(f"Profile not found: @{account.username}")
@@ -252,7 +254,9 @@ class InstagramScraper(BaseScraper):
                 post_links = await page.query_selector_all(self.POST_LINK_SELECTOR)
 
                 seen_shortcodes: set[str] = set()
-                for link in post_links[: self._max_posts * 2]:  # Get extra in case of duplicates
+                for link in post_links[
+                    : self._max_posts * 2
+                ]:  # Get extra in case of duplicates
                     if len(posts) >= self._max_posts:
                         break
 

@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import date, datetime, timedelta
+from datetime import date
 
 from playwright.async_api import Page
 
@@ -317,7 +317,7 @@ class ResultsPage:
                 time_label = await time_elem.get_attribute("aria-label")
                 if time_label:
                     departure_time = self._parse_time(time_label)
-            
+
             # Fallback time extraction
             if not departure_time:
                 time_elem = await card.query_selector(ResultsLocators.DEPARTURE_TIME)
@@ -377,7 +377,9 @@ class ResultsPage:
                 result["price"] = int(price_match.group(1))
 
             # Extract airline: "Vuelo sin escalas de AIRLINE" or "Vuelo con N escala(s) de AIRLINE"
-            airline_match = re.search(r"Vuelo (?:sin escalas|con \d+ escalas?) de ([^.]+)\.", aria_label)
+            airline_match = re.search(
+                r"Vuelo (?:sin escalas|con \d+ escalas?) de ([^.]+)\.", aria_label
+            )
             if airline_match:
                 result["airline"] = airline_match.group(1).strip()
 
@@ -390,14 +392,18 @@ class ResultsPage:
                     result["stops"] = int(stops_match.group(1))
 
             # Extract departure time: "a las HH:MM a.m./p.m."
-            time_match = re.search(r"a las\s*(\d{1,2}:\d{2})\s*(a\.m\.|p\.m\.)", aria_label)
+            time_match = re.search(
+                r"a las\s*(\d{1,2}:\d{2})\s*(a\.m\.|p\.m\.)", aria_label
+            )
             if time_match:
                 result["departure_time"] = self._parse_time(
                     f"{time_match.group(1)} {time_match.group(2)}"
                 )
 
             # Extract duration: "Duración total: X h Y min"
-            duration_match = re.search(r"Duración total:\s*(\d+\s*h(?:\s*\d+\s*min)?)", aria_label)
+            duration_match = re.search(
+                r"Duración total:\s*(\d+\s*h(?:\s*\d+\s*min)?)", aria_label
+            )
             if duration_match:
                 result["duration"] = duration_match.group(1).strip()
 
@@ -502,9 +508,7 @@ class FiltersPanel:
     async def filter_nonstop_only(self) -> None:
         """Apply filter to show only nonstop flights."""
         try:
-            dropdown = await self._page.query_selector(
-                FiltersLocators.STOPS_DROPDOWN
-            )
+            dropdown = await self._page.query_selector(FiltersLocators.STOPS_DROPDOWN)
             if dropdown:
                 await dropdown.click()
                 await self._page.wait_for_timeout(300)
@@ -517,9 +521,7 @@ class FiltersPanel:
     async def apply_filters(self) -> None:
         """Click apply filters button if present."""
         try:
-            apply_btn = await self._page.query_selector(
-                FiltersLocators.APPLY_FILTERS
-            )
+            apply_btn = await self._page.query_selector(FiltersLocators.APPLY_FILTERS)
             if apply_btn:
                 await apply_btn.click()
         except Exception:

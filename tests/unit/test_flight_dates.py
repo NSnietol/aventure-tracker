@@ -6,12 +6,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from aventure_tracker.models.flight import TimeRange, WeekendTrip
+from aventure_tracker.models.flight import WeekendTrip
 from aventure_tracker.services.flight_dates import (
     FRIDAY_DAYTIME,
     MONDAY_MORNING,
-    TUESDAY_MORNING,
     THURSDAY_EVENING,
+    TUESDAY_MORNING,
     FlightDateCalculator,
 )
 from aventure_tracker.services.holidays import HolidayService
@@ -100,9 +100,7 @@ class TestGetUpcomingWeekends:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=4)
         assert len(weekends) == 4
 
-    def test_weekends_are_sequential(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_weekends_are_sequential(self, calculator: FlightDateCalculator) -> None:
         """Test that weekends are one week apart."""
         # Start from a known Monday
         start = date(2025, 3, 3)  # Monday
@@ -113,18 +111,14 @@ class TestGetUpcomingWeekends:
         assert weekends[1].outbound_date == date(2025, 3, 14)
         assert weekends[2].outbound_date == date(2025, 3, 21)
 
-    def test_outbound_date_is_friday(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_outbound_date_is_friday(self, calculator: FlightDateCalculator) -> None:
         """Test that outbound dates are Fridays."""
         weekends = calculator.get_upcoming_weekends(weeks_ahead=5)
 
         for weekend in weekends:
             assert weekend.outbound_date.weekday() == 4  # Friday
 
-    def test_return_date_is_monday(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_return_date_is_monday(self, calculator: FlightDateCalculator) -> None:
         """Test that return dates are Mondays (adventure ends Sunday in MDE)."""
         weekends = calculator.get_upcoming_weekends(weeks_ahead=5)
 
@@ -160,9 +154,7 @@ class TestGetUpcomingWeekends:
         # Should get Friday March 14
         assert weekends[0].outbound_date == date(2025, 3, 14)
 
-    def test_default_from_date_is_today(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_default_from_date_is_today(self, calculator: FlightDateCalculator) -> None:
         """Test that from_date defaults to today."""
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1)
 
@@ -181,14 +173,14 @@ class TestBridgeWeekendDetection:
         mock_holiday_service.is_bridge_weekend.return_value = True
         calc = FlightDateCalculator(holiday_service=mock_holiday_service)
 
-        weekends = calc.get_upcoming_weekends(weeks_ahead=1, from_date=date(2025, 8, 11))
+        weekends = calc.get_upcoming_weekends(
+            weeks_ahead=1, from_date=date(2025, 8, 11)
+        )
 
         assert weekends[0].is_bridge is True
         mock_holiday_service.is_bridge_weekend.assert_called()
 
-    def test_regular_weekend_not_bridge(
-        self, mock_holiday_service: MagicMock
-    ) -> None:
+    def test_regular_weekend_not_bridge(self, mock_holiday_service: MagicMock) -> None:
         """Test that regular weekends are not marked as bridge."""
         mock_holiday_service.is_bridge_weekend.return_value = False
         calc = FlightDateCalculator(holiday_service=mock_holiday_service)
@@ -305,9 +297,9 @@ class TestIsValidOutboundFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_outbound_flight(
-            thursday, time(19, 0), weekend
-        ) is True
+        assert (
+            calculator.is_valid_outbound_flight(thursday, time(19, 0), weekend) is True
+        )
 
     def test_thursday_afternoon_flight_invalid(
         self, calculator: FlightDateCalculator
@@ -318,9 +310,9 @@ class TestIsValidOutboundFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_outbound_flight(
-            thursday, time(15, 0), weekend
-        ) is False
+        assert (
+            calculator.is_valid_outbound_flight(thursday, time(15, 0), weekend) is False
+        )
 
     def test_friday_morning_flight_valid(
         self, calculator: FlightDateCalculator
@@ -330,9 +322,7 @@ class TestIsValidOutboundFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_outbound_flight(
-            friday, time(10, 0), weekend
-        ) is True
+        assert calculator.is_valid_outbound_flight(friday, time(10, 0), weekend) is True
 
     def test_friday_evening_flight_invalid(
         self, calculator: FlightDateCalculator
@@ -342,30 +332,27 @@ class TestIsValidOutboundFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_outbound_flight(
-            friday, time(18, 0), weekend
-        ) is False
+        assert (
+            calculator.is_valid_outbound_flight(friday, time(18, 0), weekend) is False
+        )
 
-    def test_wrong_day_invalid(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_wrong_day_invalid(self, calculator: FlightDateCalculator) -> None:
         """Test Wednesday flight is invalid regardless of time."""
         friday = date(2025, 3, 7)
         wednesday = friday - timedelta(days=2)
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_outbound_flight(
-            wednesday, time(19, 0), weekend
-        ) is False
+        assert (
+            calculator.is_valid_outbound_flight(wednesday, time(19, 0), weekend)
+            is False
+        )
 
 
 class TestIsValidReturnFlight:
     """Tests for is_valid_return_flight method."""
 
-    def test_sunday_flight_invalid(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_sunday_flight_invalid(self, calculator: FlightDateCalculator) -> None:
         """Test Sunday flight is invalid in is_valid_return_flight.
 
         Sunday validity is handled exclusively by _build_weekend_pairs(),
@@ -376,9 +363,7 @@ class TestIsValidReturnFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_return_flight(
-            sunday, time(16, 0), weekend
-        ) is False
+        assert calculator.is_valid_return_flight(sunday, time(16, 0), weekend) is False
 
     def test_monday_early_morning_flight_valid(
         self, calculator: FlightDateCalculator
@@ -389,9 +374,7 @@ class TestIsValidReturnFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_return_flight(
-            monday, time(6, 0), weekend
-        ) is True
+        assert calculator.is_valid_return_flight(monday, time(6, 0), weekend) is True
 
     def test_monday_afternoon_flight_invalid(
         self, calculator: FlightDateCalculator
@@ -402,9 +385,7 @@ class TestIsValidReturnFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_return_flight(
-            monday, time(14, 0), weekend
-        ) is False
+        assert calculator.is_valid_return_flight(monday, time(14, 0), weekend) is False
 
     def test_tuesday_early_morning_flight_valid(
         self, calculator: FlightDateCalculator
@@ -415,9 +396,7 @@ class TestIsValidReturnFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_return_flight(
-            tuesday, time(6, 0), weekend
-        ) is True
+        assert calculator.is_valid_return_flight(tuesday, time(6, 0), weekend) is True
 
     def test_tuesday_afternoon_flight_invalid(
         self, calculator: FlightDateCalculator
@@ -428,22 +407,18 @@ class TestIsValidReturnFlight:
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_return_flight(
-            tuesday, time(14, 0), weekend
-        ) is False
+        assert calculator.is_valid_return_flight(tuesday, time(14, 0), weekend) is False
 
-    def test_wednesday_flight_invalid(
-        self, calculator: FlightDateCalculator
-    ) -> None:
+    def test_wednesday_flight_invalid(self, calculator: FlightDateCalculator) -> None:
         """Test Wednesday flight is invalid regardless of time."""
         friday = date(2025, 3, 7)
         wednesday = friday + timedelta(days=5)
         weekends = calculator.get_upcoming_weekends(weeks_ahead=1, from_date=friday)
         weekend = weekends[0]
 
-        assert calculator.is_valid_return_flight(
-            wednesday, time(6, 0), weekend
-        ) is False
+        assert (
+            calculator.is_valid_return_flight(wednesday, time(6, 0), weekend) is False
+        )
 
 
 class TestIntegrationWithHolidayService:
@@ -454,7 +429,9 @@ class TestIntegrationWithHolidayService:
         calc = FlightDateCalculator(holidays_config_path=holidays_config)
 
         # August 15, 2025 is Friday before Monday holiday (August 18)
-        weekends = calc.get_upcoming_weekends(weeks_ahead=1, from_date=date(2025, 8, 15))
+        weekends = calc.get_upcoming_weekends(
+            weeks_ahead=1, from_date=date(2025, 8, 15)
+        )
 
         assert weekends[0].is_bridge is True
 

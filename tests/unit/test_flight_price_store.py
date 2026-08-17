@@ -1,15 +1,13 @@
 """Tests for flight price store."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
-import pytest
 import yaml
 
 from aventure_tracker.services.flight_price_store import (
     FlightPriceStore,
     PriceRecord,
-    RouteHistory,
 )
 
 
@@ -43,237 +41,75 @@ class TestPriceRecord:
         assert record.checked_at.date() == now.date()
 
 
-class TestRouteHistory:
-    """Tests for RouteHistory."""
-
-    def test_create_history(self) -> None:
-        """Should create route history."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[],
-        )
-
-        assert history.route == "BAQ-MDE"
-        assert history.travel_date == date(2026, 8, 15)
-
-    def test_latest_price(self) -> None:
-        """Should return latest price."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[
-                PriceRecord(price=200000, checked_at=datetime.now() - timedelta(days=1)),
-                PriceRecord(price=150000, checked_at=datetime.now()),
-            ],
-        )
-
-        assert history.latest_price == 150000
-
-    def test_previous_price(self) -> None:
-        """Should return previous price."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[
-                PriceRecord(price=200000, checked_at=datetime.now() - timedelta(days=1)),
-                PriceRecord(price=150000, checked_at=datetime.now()),
-            ],
-        )
-
-        assert history.previous_price == 200000
-
-    def test_lowest_price(self) -> None:
-        """Should return lowest price."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[
-                PriceRecord(price=200000, checked_at=datetime.now() - timedelta(days=2)),
-                PriceRecord(price=120000, checked_at=datetime.now() - timedelta(days=1)),
-                PriceRecord(price=150000, checked_at=datetime.now()),
-            ],
-        )
-
-        assert history.lowest_price == 120000
-
-    def test_price_change(self) -> None:
-        """Should calculate price change."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[
-                PriceRecord(price=200000, checked_at=datetime.now() - timedelta(days=1)),
-                PriceRecord(price=150000, checked_at=datetime.now()),
-            ],
-        )
-
-        assert history.price_change == -50000
-
-    def test_add_price(self) -> None:
-        """Should add new price record."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[],
-        )
-
-        result = history.add_price(150000)
-
-        assert result is True
-        assert len(history.records) == 1
-        assert history.latest_price == 150000
-
-    def test_add_price_skips_duplicate(self) -> None:
-        """Should skip adding if price is same as latest."""
-        history = RouteHistory(
-            route="BAQ-MDE",
-            travel_date=date(2026, 8, 15),
-            records=[],
-        )
-
-        # First price - should add
-        result1 = history.add_price(150000)
-        assert result1 is True
-        assert len(history.records) == 1
-
-        # Same price - should skip
-        result2 = history.add_price(150000)
-        assert result2 is False
-        assert len(history.records) == 1
-
-        # Different price - should add
-        result3 = history.add_price(140000)
-        assert result3 is True
-        assert len(history.records) == 2
-
-
 class TestFlightPriceStore:
     """Tests for FlightPriceStore."""
 
     def test_init_creates_empty_store(self, tmp_path: Path) -> None:
-        """Should initialize with empty store."""
+        """Should initialize with empty flights store."""
         store = FlightPriceStore(path=tmp_path / "prices.yaml")
+        assert len(store.get_all_flights()) == 0
 
-        assert len(store.get_all_routes()) == 0
-
-    def test_set_and_get_price(self, tmp_path: Path) -> None:
-        """Should set and get prices."""
+    def test_set_and_get_flight_price(self, tmp_path: Path) -> None:
+        """Should set and retrieve flight price."""
         store = FlightPriceStore(path=tmp_path / "prices.yaml")
+        store.set_flight_price("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM", 150000)
 
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-
-        assert store.get_price("BAQ-MDE", date(2026, 8, 15)) == 150000
-
-    def test_get_previous_price(self, tmp_path: Path) -> None:
-        """Should get previous price."""
-        store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 200000)
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-
-        assert store.get_previous_price("BAQ-MDE", date(2026, 8, 15)) == 200000
+        result = store.get_flight("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM")
+        assert result is not None
+        assert result.latest_price == 150000
 
     def test_save_and_load(self, tmp_path: Path) -> None:
-        """Should persist and load data."""
+        """Should persist and reload flight data."""
         path = tmp_path / "prices.yaml"
 
-        # Save
         store1 = FlightPriceStore(path=path)
-        store1.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-        store1.set_price("CTG-MDE", date(2026, 8, 22), 180000)
+        store1.set_flight_price("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM", 150000)
+        store1.set_flight_price(
+            "CTG-MDE", date(2026, 8, 22), "09:00", "Avianca", 180000
+        )
         store1.save()
 
-        # Load
         store2 = FlightPriceStore(path=path)
-
-        assert store2.get_price("BAQ-MDE", date(2026, 8, 15)) == 150000
-        assert store2.get_price("CTG-MDE", date(2026, 8, 22)) == 180000
-
-    def test_get_history(self, tmp_path: Path) -> None:
-        """Should get full history."""
-        store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 200000)
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 180000)
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-
-        history = store.get_history("BAQ-MDE", date(2026, 8, 15))
-
-        assert history is not None
-        assert len(history.records) == 3
-        assert history.lowest_price == 150000
-
-    def test_get_all_routes(self, tmp_path: Path) -> None:
-        """Should get all tracked routes."""
-        store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-        store.set_price("CTG-MDE", date(2026, 8, 15), 180000)
-        store.set_price("BAQ-MDE", date(2026, 8, 22), 160000)
-
-        routes = store.get_all_routes()
-
-        assert len(routes) == 3
-
-    def test_get_routes_for_date(self, tmp_path: Path) -> None:
-        """Should get routes for specific date."""
-        store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
-        store.set_price("CTG-MDE", date(2026, 8, 15), 180000)
-        store.set_price("BAQ-MDE", date(2026, 8, 22), 160000)
-
-        routes = store.get_routes_for_date(date(2026, 8, 15))
-
-        assert len(routes) == 2
+        r1 = store2.get_flight("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM")
+        r2 = store2.get_flight("CTG-MDE", date(2026, 8, 22), "09:00", "Avianca")
+        assert r1 is not None and r1.latest_price == 150000
+        assert r2 is not None and r2.latest_price == 180000
 
     def test_get_lowest_prices(self, tmp_path: Path) -> None:
         """Should get lowest prices per route."""
         store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        # Use new API with flight details
         store.set_flight_price("BAQ-MDE", date(2026, 8, 15), "08:00", "LATAM", 150000)
         store.set_flight_price("BAQ-MDE", date(2026, 8, 22), "10:00", "LATAM", 120000)
-        store.set_flight_price("CTG-MDE", date(2026, 8, 15), "09:00", "AVIANCA", 180000)
+        store.set_flight_price("CTG-MDE", date(2026, 8, 15), "09:00", "Avianca", 180000)
 
         lowest = store.get_lowest_prices()
-
         assert lowest["BAQ-MDE"] == 120000
         assert lowest["CTG-MDE"] == 180000
 
     def test_cleanup_old_dates(self, tmp_path: Path) -> None:
-        """Should remove old entries."""
+        """Should remove flights with past travel dates."""
         store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        store.set_price("BAQ-MDE", date(2026, 7, 1), 150000)  # Old
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 160000)  # Current
+        store.set_flight_price("BAQ-MDE", date(2026, 7, 1), "18:30", "LATAM", 150000)
+        store.set_flight_price("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM", 160000)
 
         removed = store.cleanup_old_dates(before=date(2026, 8, 1))
-
         assert removed == 1
-        assert len(store.get_all_routes()) == 1
+        assert len(store.get_all_flights()) == 1
 
-    def test_nonexistent_route(self, tmp_path: Path) -> None:
-        """Should return None for nonexistent route."""
+    def test_nonexistent_flight_returns_none(self, tmp_path: Path) -> None:
+        """Should return None for unknown flight."""
         store = FlightPriceStore(path=tmp_path / "prices.yaml")
-
-        assert store.get_price("XXX-YYY", date(2026, 8, 15)) is None
-        assert store.get_previous_price("XXX-YYY", date(2026, 8, 15)) is None
-        assert store.get_history("XXX-YYY", date(2026, 8, 15)) is None
+        assert store.get_flight("XXX-YYY", date(2026, 8, 15), "08:00", "LATAM") is None
 
     def test_yaml_format(self, tmp_path: Path) -> None:
-        """Should save in readable YAML format."""
+        """Should save flights section in YAML."""
         path = tmp_path / "prices.yaml"
         store = FlightPriceStore(path=path)
-
-        store.set_price("BAQ-MDE", date(2026, 8, 15), 150000)
+        store.set_flight_price("BAQ-MDE", date(2026, 8, 15), "18:30", "LATAM", 150000)
         store.save()
 
-        # Verify YAML structure
         with open(path) as f:
             data = yaml.safe_load(f)
 
         assert "updated_at" in data
-        assert "routes" in data
-        assert "BAQ-MDE_2026-08-15" in data["routes"]
+        assert "flights" in data

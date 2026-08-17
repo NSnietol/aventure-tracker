@@ -164,9 +164,7 @@ class TestPriceCell:
 class TestCalendarData:
     """Tests for CalendarData dataclass."""
 
-    def test_get_cell_existing(
-        self, sample_routes: list[RouteConfig]
-    ) -> None:
+    def test_get_cell_existing(self, sample_routes: list[RouteConfig]) -> None:
         """Test getting an existing cell."""
         d = date(2026, 1, 16)
         route = sample_routes[0]
@@ -182,9 +180,7 @@ class TestCalendarData:
         result = data.get_cell(d, route)
         assert result.price == 100000
 
-    def test_get_cell_missing(
-        self, sample_routes: list[RouteConfig]
-    ) -> None:
+    def test_get_cell_missing(self, sample_routes: list[RouteConfig]) -> None:
         """Test getting a missing cell returns empty cell."""
         d = date(2026, 1, 16)
         route = sample_routes[0]

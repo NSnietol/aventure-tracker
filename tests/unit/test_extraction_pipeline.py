@@ -1,6 +1,5 @@
 """Tests for extraction pipeline orchestrator."""
 
-import json
 from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -15,7 +14,6 @@ from aventure_tracker.services.extraction_pipeline import (
     PipelineStats,
     run_extraction_cli,
 )
-from aventure_tracker.services.price_history import PriceChange
 
 
 @pytest.fixture
@@ -600,4 +598,6 @@ class TestRunExtractionCLI:
             agency="brutaltravel",
         )
 
-        mock_pipeline.run_single_agency.assert_called_once_with("brutaltravel", "agosto")
+        mock_pipeline.run_single_agency.assert_called_once_with(
+            "brutaltravel", "agosto"
+        )

@@ -1,6 +1,6 @@
 """Tests for price history SQLite service."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -280,9 +280,7 @@ class TestPriceHistoryDB:
         assert len(events) == 1
         assert events[0]["name"] == "Cavernas del Nus"
 
-    def test_get_events_by_agency_future_only(
-        self, db: PriceHistoryDB
-    ) -> None:
+    def test_get_events_by_agency_future_only(self, db: PriceHistoryDB) -> None:
         """Should optionally filter to future events only."""
         # Past event
         past_event = ExtractedEvent(

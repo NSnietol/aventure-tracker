@@ -1,16 +1,15 @@
 """Tests for EventMatcher service."""
 
-import yaml
-import pytest
 from datetime import date
 from pathlib import Path
+
+import pytest
 
 from aventure_tracker.services.event_matcher import (
     EventMatcher,
     MatchedEvent,
     WeekendMatch,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -120,6 +119,7 @@ def matcher(cache_file: Path, destinations_file: Path) -> EventMatcher:
 # MatchedEvent tests
 # ---------------------------------------------------------------------------
 
+
 class TestMatchedEvent:
     """Tests for MatchedEvent dataclass."""
 
@@ -159,6 +159,7 @@ class TestMatchedEvent:
 # WeekendMatch tests
 # ---------------------------------------------------------------------------
 
+
 class TestWeekendMatch:
     """Tests for WeekendMatch dataclass."""
 
@@ -180,6 +181,7 @@ class TestWeekendMatch:
 # ---------------------------------------------------------------------------
 # EventMatcher.load() tests
 # ---------------------------------------------------------------------------
+
 
 class TestEventMatcherLoad:
     """Tests for loading events from cache."""
@@ -211,6 +213,7 @@ class TestEventMatcherLoad:
 # ---------------------------------------------------------------------------
 # EventMatcher.find_events_for_dates() tests
 # ---------------------------------------------------------------------------
+
 
 class TestFindEventsForDates:
     """Tests for matching cheap dates to events."""
@@ -254,14 +257,10 @@ class TestFindEventsForDates:
         self, matcher: EventMatcher
     ) -> None:
         # Aug 21 and Sep 20 are far apart → two separate windows
-        result = matcher.find_events_for_dates(
-            [date(2026, 8, 21), date(2026, 9, 20)]
-        )
+        result = matcher.find_events_for_dates([date(2026, 8, 21), date(2026, 9, 20)])
         assert len(result) == 2
 
-    def test_adjacent_dates_merged_into_one_window(
-        self, matcher: EventMatcher
-    ) -> None:
+    def test_adjacent_dates_merged_into_one_window(self, matcher: EventMatcher) -> None:
         # Aug 21, 22, 23 → all fall within the same window
         result = matcher.find_events_for_dates(
             [date(2026, 8, 21), date(2026, 8, 22), date(2026, 8, 23)]
@@ -296,6 +295,7 @@ class TestFindEventsForDates:
 # EventMatcher._group_into_windows() tests
 # ---------------------------------------------------------------------------
 
+
 class TestGroupIntoWindows:
     """Tests for internal window grouping logic."""
 
@@ -323,7 +323,5 @@ class TestGroupIntoWindows:
     def test_dates_far_apart_create_separate_windows(
         self, matcher: EventMatcher
     ) -> None:
-        windows = matcher._group_into_windows(
-            [date(2026, 8, 21), date(2026, 9, 5)]
-        )
+        windows = matcher._group_into_windows([date(2026, 8, 21), date(2026, 9, 5)])
         assert len(windows) == 2

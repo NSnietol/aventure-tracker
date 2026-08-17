@@ -243,7 +243,9 @@ class TestAccountsConfig:
         config = AccountsConfig(
             accounts=[
                 InstagramAccountConfig(username="active", name="Active", enabled=True),
-                InstagramAccountConfig(username="inactive", name="Inactive", enabled=False),
+                InstagramAccountConfig(
+                    username="inactive", name="Inactive", enabled=False
+                ),
             ]
         )
 
@@ -389,7 +391,9 @@ class TestStateData:
     def test_state_data_set_flight(self) -> None:
         """Test setting flight state."""
         state = StateData.empty()
-        flight_state = state.set_flight_state("BAQ-MDE-2025-03-15", 150000, notified=True)
+        flight_state = state.set_flight_state(
+            "BAQ-MDE-2025-03-15", 150000, notified=True
+        )
 
         assert flight_state.last_price == 150000
         assert flight_state.last_notified is not None

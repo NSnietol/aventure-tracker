@@ -4,8 +4,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from aventure_tracker.config import Settings
 
 
@@ -35,8 +33,11 @@ class TestSettings:
 
     def test_settings_detects_ci_false(self, mock_env_vars: dict[str, str]) -> None:
         """Test that settings correctly detects CI=false."""
-        # Arrange & Act
-        settings = Settings()
+        # Arrange & Act — explicitly remove GITHUB_ACTIONS so test is not
+        # affected by the CI runner environment
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GITHUB_ACTIONS", None)
+            settings = Settings()
 
         # Assert
         assert settings.is_ci is False
@@ -52,7 +53,7 @@ class TestSettings:
                 gist_token="t",
             )
             assert settings.is_ci is True
-        
+
         # Without GITHUB_ACTIONS, is_ci should be False even with CI=true
         with patch.dict(os.environ, {"CI": "true", "GITHUB_ACTIONS": ""}, clear=False):
             settings = Settings()

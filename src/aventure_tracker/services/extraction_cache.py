@@ -140,8 +140,7 @@ class ExtractionCache:
             "updated_at": datetime.now().isoformat(),
             "total_entries": len(self._entries),
             "entries": {
-                hash_key: entry.to_dict()
-                for hash_key, entry in self._entries.items()
+                hash_key: entry.to_dict() for hash_key, entry in self._entries.items()
             },
         }
 
@@ -246,10 +245,7 @@ class ExtractionCache:
         Returns:
             Number of entries cleared.
         """
-        to_remove = [
-            h for h, e in self._entries.items()
-            if e.agency == agency
-        ]
+        to_remove = [h for h, e in self._entries.items() if e.agency == agency]
         for h in to_remove:
             del self._entries[h]
         if to_remove:

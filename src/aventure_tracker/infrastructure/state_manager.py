@@ -106,7 +106,9 @@ class StateManager:
 
                 # Check for specific error codes
                 if response.status_code == 401:
-                    raise GistAuthError("Invalid GitHub token or insufficient permissions")
+                    raise GistAuthError(
+                        "Invalid GitHub token or insufficient permissions"
+                    )
                 if response.status_code == 404:
                     raise GistNotFoundError(f"Gist not found: {self._gist_id}")
                 if response.status_code == 403:
@@ -135,7 +137,9 @@ class StateManager:
             if attempt < retries - 1:
                 time.sleep(RETRY_DELAY_SECONDS * (attempt + 1))
 
-        raise StateManagerError(f"Request failed after {retries} attempts: {last_error}")
+        raise StateManagerError(
+            f"Request failed after {retries} attempts: {last_error}"
+        )
 
     def read(self) -> StateData:
         """Read state from the GitHub Gist.

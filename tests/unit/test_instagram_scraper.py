@@ -1,6 +1,6 @@
 """Tests for Instagram Scraper."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -112,9 +112,7 @@ class TestExtractShortcode:
         url = "/p/A-B_C-123/"
         assert scraper._extract_shortcode(url) == "A-B_C-123"
 
-    def test_extract_invalid_url_returns_none(
-        self, scraper: InstagramScraper
-    ) -> None:
+    def test_extract_invalid_url_returns_none(self, scraper: InstagramScraper) -> None:
         """Test invalid URL returns None."""
         assert scraper._extract_shortcode("/profile/user/") is None
         assert scraper._extract_shortcode("https://instagram.com/") is None
@@ -359,12 +357,8 @@ class TestGetRecentPosts:
     ) -> None:
         """Test getting posts from multiple accounts."""
         accounts = [
-            InstagramAccountConfig(
-                username="account1", name="Account 1", enabled=True
-            ),
-            InstagramAccountConfig(
-                username="account2", name="Account 2", enabled=True
-            ),
+            InstagramAccountConfig(username="account1", name="Account 1", enabled=True),
+            InstagramAccountConfig(username="account2", name="Account 2", enabled=True),
         ]
 
         posts_account1 = [
@@ -403,12 +397,8 @@ class TestGetRecentPosts:
     ) -> None:
         """Test that disabled accounts are skipped."""
         accounts = [
-            InstagramAccountConfig(
-                username="enabled", name="Enabled", enabled=True
-            ),
-            InstagramAccountConfig(
-                username="disabled", name="Disabled", enabled=False
-            ),
+            InstagramAccountConfig(username="enabled", name="Enabled", enabled=True),
+            InstagramAccountConfig(username="disabled", name="Disabled", enabled=False),
         ]
 
         with patch.object(scraper, "scrape", new_callable=AsyncMock) as mock_scrape:
@@ -426,12 +416,8 @@ class TestGetRecentPosts:
     ) -> None:
         """Test error handling for individual accounts."""
         accounts = [
-            InstagramAccountConfig(
-                username="good", name="Good", enabled=True
-            ),
-            InstagramAccountConfig(
-                username="bad", name="Bad", enabled=True
-            ),
+            InstagramAccountConfig(username="good", name="Good", enabled=True),
+            InstagramAccountConfig(username="bad", name="Bad", enabled=True),
         ]
 
         with patch.object(scraper, "scrape", new_callable=AsyncMock) as mock_scrape:
@@ -451,9 +437,7 @@ class TestGetPostDetails:
     """Tests for get_post_details method."""
 
     @pytest.mark.asyncio
-    async def test_get_post_details_fallback(
-        self, scraper: InstagramScraper
-    ) -> None:
+    async def test_get_post_details_fallback(self, scraper: InstagramScraper) -> None:
         """Test get_post_details returns basic info on failure."""
         # Force Instaloader to fail
         scraper._loader = None

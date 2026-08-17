@@ -149,9 +149,7 @@ class ExtractedEvent:
     @property
     def low_confidence_fields(self) -> list[str]:
         """Get list of fields with confidence < 70%."""
-        return [
-            name for name, conf in self.confidence.items() if not conf.is_reliable
-        ]
+        return [name for name, conf in self.confidence.items() if not conf.is_reliable]
 
     @property
     def needs_review(self) -> bool:

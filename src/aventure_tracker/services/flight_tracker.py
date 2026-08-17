@@ -1,7 +1,7 @@
 """Flight tracker service for monitoring flight prices."""
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, time
 from pathlib import Path
 
@@ -12,7 +12,6 @@ from aventure_tracker.models.flight import (
     RouteConfig,
     RoutesConfig,
     SearchDay,
-    AirlinePolicy,
 )
 from aventure_tracker.scrapers.google_flights import GoogleFlightsScraper
 from aventure_tracker.services.flight_dates import FlightDateCalculator
@@ -102,7 +101,9 @@ class WeekendPair:
     return_options: list[ReturnOption]
     events: list  # list[MatchedEvent] — imported at runtime to avoid circular
     sunday_adventure: bool = False
-    return_only: bool = False  # True when only return flight is cheap (no cheap outbound)
+    return_only: bool = (
+        False  # True when only return flight is cheap (no cheap outbound)
+    )
 
     @property
     def recommended_return(self) -> ReturnOption | None:
@@ -130,8 +131,7 @@ class WeekendPair:
     def date_label(self) -> str:
         """Human readable window label."""
         return (
-            f"{self.window_start.strftime('%d')}-"
-            f"{self.window_end.strftime('%d %b %Y')}"
+            f"{self.window_start.strftime('%d')}-{self.window_end.strftime('%d %b %Y')}"
         )
 
 
@@ -239,9 +239,10 @@ class FlightTrackerService:
     def _load_routes(self) -> RoutesConfig:
         """Load routes configuration, applying env var overrides from settings."""
         if self._routes is None:
-            from aventure_tracker.config import Settings
             settings = self._settings if hasattr(self, "_settings") else None
-            self._routes = RoutesConfig.from_yaml(self._routes_config_path, settings=settings)
+            self._routes = RoutesConfig.from_yaml(
+                self._routes_config_path, settings=settings
+            )
             logger.info(f"Loaded {len(self._routes.routes)} routes")
             policy = self._routes.airline_policy
             logger.info(
@@ -268,7 +269,9 @@ class FlightTrackerService:
             self._scraper = GoogleFlightsScraper(headless=True)
         return self._scraper
 
-    def _is_valid_time_for_day(self, departure_time: str, search_day: SearchDay) -> bool:
+    def _is_valid_time_for_day(
+        self, departure_time: str, search_day: SearchDay
+    ) -> bool:
         """Check if departure time is valid for the search day.
 
         Args:
@@ -380,14 +383,18 @@ class FlightTrackerService:
                         flights = await scraper.scrape(route, travel_date)
 
                         if not flights:
-                            logger.info(f"  {route} {travel_date} ({search_day.value}): No flights found")
+                            logger.info(
+                                f"  {route} {travel_date} ({search_day.value}): No flights found"
+                            )
                             continue
 
                         # Filter and process flights
                         for flight in flights:
                             # Check time filter
                             departure_time_str = flight.departure_time.strftime("%H:%M")
-                            if not self._is_valid_time_for_day(departure_time_str, search_day):
+                            if not self._is_valid_time_for_day(
+                                departure_time_str, search_day
+                            ):
                                 logger.debug(
                                     f"    Skipping {flight.airline} {departure_time_str}: "
                                     f"outside time window for {search_day.value}"
@@ -524,18 +531,16 @@ class FlightTrackerService:
         try:
             # Parse departure time to create datetime
             from datetime import datetime as dt
+
             hour, minute = map(int, flight.departure_time.split(":"))
-            departure_dt = dt.combine(
-                flight.travel_date,
-                time(hour, minute)
-            )
+            departure_dt = dt.combine(flight.travel_date, time(hour, minute))
 
             self._notifier.send_flight_alert(
                 route=flight.route,
                 price=flight.price,
                 airline=flight.airline,
                 departure=departure_dt,
-                link=f"https://www.google.com/travel/flights",  # Generic link
+                link="https://www.google.com/travel/flights",  # Generic link
                 prev_price=alert.previous_price,
             )
         except Exception as e:

@@ -6,9 +6,9 @@ import pytest
 import yaml
 
 from aventure_tracker.services.activity_history import (
+    MAX_CHECK_COUNT,
     ActivityHistoryManager,
     ActivityRecord,
-    MAX_CHECK_COUNT,
 )
 
 
@@ -153,9 +153,7 @@ class TestLoadHistory:
 
         assert manager.total_records == 0
 
-    def test_load_existing(
-        self, history_path: Path, sample_history: Path
-    ) -> None:
+    def test_load_existing(self, history_path: Path, sample_history: Path) -> None:
         """Test loading existing history file."""
         manager = ActivityHistoryManager(history_path=history_path)
         manager.load()
@@ -336,9 +334,7 @@ class TestGetAccountHistory:
         assert "ABC123" in post_ids
         assert "XYZ789" in post_ids
 
-    def test_get_account_history_unknown(
-        self, manager: ActivityHistoryManager
-    ) -> None:
+    def test_get_account_history_unknown(self, manager: ActivityHistoryManager) -> None:
         """Test getting history for unknown account."""
         manager.load()
 
@@ -350,9 +346,7 @@ class TestGetAccountHistory:
 class TestGetSkippedCount:
     """Tests for skipped count."""
 
-    def test_get_skipped_count(
-        self, history_path: Path, sample_history: Path
-    ) -> None:
+    def test_get_skipped_count(self, history_path: Path, sample_history: Path) -> None:
         """Test counting posts that will be skipped."""
         manager = ActivityHistoryManager(history_path=history_path)
         manager.load()
@@ -374,9 +368,7 @@ class TestGetSkippedCount:
 class TestClear:
     """Tests for clearing history."""
 
-    def test_clear_account(
-        self, history_path: Path, sample_history: Path
-    ) -> None:
+    def test_clear_account(self, history_path: Path, sample_history: Path) -> None:
         """Test clearing a specific account."""
         manager = ActivityHistoryManager(history_path=history_path)
         manager.load()
@@ -386,9 +378,7 @@ class TestClear:
         assert manager.get_account_history("brutaltravel.co") == []
         assert len(manager.get_account_history("medellinbungee")) == 1
 
-    def test_clear_all(
-        self, history_path: Path, sample_history: Path
-    ) -> None:
+    def test_clear_all(self, history_path: Path, sample_history: Path) -> None:
         """Test clearing all history."""
         manager = ActivityHistoryManager(history_path=history_path)
         manager.load()

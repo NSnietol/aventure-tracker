@@ -137,8 +137,18 @@ class FlightCalendarDisplay:
 
     # Spanish month abbreviations
     MONTHS = [
-        "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-        "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+        "Ene",
+        "Feb",
+        "Mar",
+        "Abr",
+        "May",
+        "Jun",
+        "Jul",
+        "Ago",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dic",
     ]
 
     # Spanish day abbreviations
@@ -162,6 +172,7 @@ class FlightCalendarDisplay:
         """Get or create the date calculator."""
         if self._date_calculator is None:
             from aventure_tracker.services.holidays import HolidayService
+
             holiday_service = HolidayService()
             self._date_calculator = FlightDateCalculator(
                 holiday_service=holiday_service
@@ -342,7 +353,9 @@ class FlightCalendarDisplay:
                 date_str = self._format_date(best_date)
                 threshold_note = ""
                 if best_price <= route.price_threshold:
-                    threshold_note = f" {INDICATOR_TARGET} (at/below ${route.price_threshold:,})"
+                    threshold_note = (
+                        f" {INDICATOR_TARGET} (at/below ${route.price_threshold:,})"
+                    )
                 lines.append(
                     f"  {route}: Best ${best_price:,} on {date_str}{threshold_note}"
                 )
@@ -351,11 +364,13 @@ class FlightCalendarDisplay:
 
         # Count alerts
         target_count = sum(
-            1 for cell in data.prices.values()
+            1
+            for cell in data.prices.values()
             if cell.is_below_threshold and cell.price is not None
         )
         drop_count = sum(
-            1 for cell in data.prices.values()
+            1
+            for cell in data.prices.values()
             if cell.price_change is not None and cell.price_change < 0
         )
         bridge_count = len(data.bridge_dates)

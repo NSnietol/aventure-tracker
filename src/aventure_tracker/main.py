@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 
@@ -21,12 +21,12 @@ from aventure_tracker.services.event_matcher import EventMatcher
 from aventure_tracker.services.flight_calendar import (
     FlightCalendarDisplay,
 )
+from aventure_tracker.services.flight_dates import FlightDateCalculator
 from aventure_tracker.services.flight_tracker import (
     FlightTrackerResult,
     FlightTrackerService,
 )
 from aventure_tracker.services.holidays import HolidayService
-from aventure_tracker.services.flight_dates import FlightDateCalculator
 
 # Default weeks ahead for flight calendar (user requested 2.5 months planning horizon)
 DEFAULT_WEEKS_AHEAD = 10
@@ -113,7 +113,6 @@ class AdventureOrchestrator:
 
     def _setup_logging(self) -> None:
         """Configure logging based on settings."""
-        import time as _time
 
         log_level = getattr(logging, self._settings.log_level.upper(), logging.INFO)
 
@@ -123,6 +122,7 @@ class AdventureOrchestrator:
         class ColombiaFormatter(logging.Formatter):
             def converter(self, timestamp: float):  # type: ignore[override]
                 import datetime
+
                 return datetime.datetime.fromtimestamp(
                     timestamp,
                     tz=datetime.timezone(datetime.timedelta(hours=-5)),
@@ -144,12 +144,16 @@ class AdventureOrchestrator:
 
     async def _init_infrastructure(self) -> None:
         """Initialize infrastructure components.
-        
+
         - In CI (GitHub Actions): Use Gist for state persistence
         - In local: Skip Gist, use local YAML files only
         """
         # State manager ONLY in CI environment
-        if self._settings.is_ci and self._settings.gist_id and self._settings.gist_token:
+        if (
+            self._settings.is_ci
+            and self._settings.gist_id
+            and self._settings.gist_token
+        ):
             try:
                 self._state_manager = StateManager(
                     gist_id=self._settings.gist_id,
@@ -158,7 +162,9 @@ class AdventureOrchestrator:
                 self._state_manager.read()  # Load initial state
                 self._logger.info("State manager initialized (CI mode)")
             except Exception as e:
-                self._logger.warning(f"Gist state manager failed: {e}. Continuing without remote state.")
+                self._logger.warning(
+                    f"Gist state manager failed: {e}. Continuing without remote state."
+                )
                 self._state_manager = None
         else:
             self._logger.info("Local mode - using local YAML storage only")
@@ -170,7 +176,9 @@ class AdventureOrchestrator:
                     api_key=self._settings.resend_api_key,
                     to_email=self._settings.email_to,
                 )
-                self._logger.info(f"Email notifier initialized → {self._settings.email_to}")
+                self._logger.info(
+                    f"Email notifier initialized → {self._settings.email_to}"
+                )
 
     def _init_trackers(self) -> None:
         """Initialize tracker services."""
@@ -332,9 +340,7 @@ class AdventureOrchestrator:
         if errors and self._email_notifier:
             try:
                 routes_checked = flights_result.routes_checked if flights_result else 0
-                run_url = os.environ.get(
-                    "GITHUB_SERVER_URL", ""
-                )
+                run_url = os.environ.get("GITHUB_SERVER_URL", "")
                 repo = os.environ.get("GITHUB_REPOSITORY", "")
                 run_id = os.environ.get("GITHUB_RUN_ID", "")
                 if run_url and repo and run_id:
@@ -379,13 +385,14 @@ class AdventureOrchestrator:
         skipping images already in cache (content-based deduplication).
         """
         import os
+
+        from aventure_tracker.services.extraction_cache import ExtractionCache
+        from aventure_tracker.services.file_organizer import detect_file_type
         from aventure_tracker.services.image_event_extractor import (
             ExtractionConfig,
             ImageEventExtractor,
             ModelProvider,
         )
-        from aventure_tracker.services.extraction_cache import ExtractionCache
-        from aventure_tracker.services.file_organizer import detect_file_type
 
         inbox_path = Path("inbox")
         cache_path = Path("data/extraction_cache.yaml")
@@ -453,17 +460,25 @@ class AdventureOrchestrator:
         Args:
             flights_result: Result from flight tracker with price_alerts.
         """
-        from aventure_tracker.services.flight_tracker import FlightFound, WeekendPair, ReturnOption
+        from aventure_tracker.services.flight_tracker import (
+            FlightFound,
+        )
 
         alerts = flights_result.price_alerts
-        self._logger.info(f"Building consolidated report for {len(alerts)} cheap flight(s)")
+        self._logger.info(
+            f"Building consolidated report for {len(alerts)} cheap flight(s)"
+        )
 
         # Separate by direction
         outbound_all: list[FlightFound] = []
         return_all: list[FlightFound] = []
         for alert in alerts:
             f = alert.flight
-            if "BAQ" in f.route and "MDE" in f.route and f.route.index("BAQ") < f.route.index("MDE"):
+            if (
+                "BAQ" in f.route
+                and "MDE" in f.route
+                and f.route.index("BAQ") < f.route.index("MDE")
+            ):
                 outbound_all.append(f)
             else:
                 return_all.append(f)
@@ -490,7 +505,11 @@ class AdventureOrchestrator:
         self._logger.info(f"Built {len(pairs)} weekend pair(s)")
         for p in pairs:
             ret = p.recommended_return
-            ret_str = f"{ret.flight.travel_date} {ret.flight.airline} ${ret.flight.price:,}" if ret else "no return"
+            ret_str = (
+                f"{ret.flight.travel_date} {ret.flight.airline} ${ret.flight.price:,}"
+                if ret
+                else "no return"
+            )
             self._logger.info(
                 f"  {p.date_label}: {p.outbound.travel_date} {p.outbound.airline} "
                 f"${p.outbound.price:,} → {ret_str} "
@@ -509,13 +528,21 @@ class AdventureOrchestrator:
         if not self._email_notifier:
             self._logger.info("=== WEEKEND REPORT (no notifier) ===")
             for p in pairs_with_events:
-                self._logger.info(f"Finde {p.date_label}{'  ⚠ sunday→monday' if p.sunday_adventure else ''}:")
-                self._logger.info(f"  Ida:    {p.outbound.travel_date} {p.outbound.departure_time} {p.outbound.airline} ${p.outbound.price:,}")
+                self._logger.info(
+                    f"Finde {p.date_label}{'  ⚠ sunday→monday' if p.sunday_adventure else ''}:"
+                )
+                self._logger.info(
+                    f"  Ida:    {p.outbound.travel_date} {p.outbound.departure_time} {p.outbound.airline} ${p.outbound.price:,}"
+                )
                 for i, ro in enumerate(p.return_options):
                     tag = "✅ recomendado" if ro.is_recommended else f"alt {i}"
-                    self._logger.info(f"  Vuelta: {ro.flight.travel_date} {ro.flight.departure_time} {ro.flight.airline} ${ro.flight.price:,} [{tag}]")
+                    self._logger.info(
+                        f"  Vuelta: {ro.flight.travel_date} {ro.flight.departure_time} {ro.flight.airline} ${ro.flight.price:,} [{tag}]"
+                    )
                 for ev in p.events[:4]:
-                    self._logger.info(f"  • {ev.name} ({ev.date_label}) {ev.price_formatted}")
+                    self._logger.info(
+                        f"  • {ev.name} ({ev.date_label}) {ev.price_formatted}"
+                    )
             self._logger.info("===================================")
             return
 
@@ -527,7 +554,7 @@ class AdventureOrchestrator:
     # ---------------------------------------------------------------------------
 
     @staticmethod
-    def _has_sunday_events(events: list, window_start: "date", window_end: "date") -> bool:
+    def _has_sunday_events(events: list, window_start: date, window_end: date) -> bool:
         """Check if any events fall on Sunday within the weekend window.
 
         If yes, return flights must be Monday (adventure runs all day Sunday).
@@ -541,6 +568,7 @@ class AdventureOrchestrator:
             True if any event starts or spans a Sunday in this window.
         """
         from datetime import timedelta
+
         # Find all Sundays in the window
         sundays = set()
         current = window_start
@@ -590,8 +618,10 @@ class AdventureOrchestrator:
         Returns:
             List of WeekendPair.
         """
-        from aventure_tracker.services.flight_tracker import WeekendPair, ReturnOption
-        from datetime import timedelta, time as dtime
+        from datetime import time as dtime
+        from datetime import timedelta
+
+        from aventure_tracker.services.flight_tracker import ReturnOption, WeekendPair
 
         # Build a quick lookup: window_start → WeekendMatch
         match_by_window: dict = {}
@@ -663,13 +693,20 @@ class AdventureOrchestrator:
                 best_priority = priority_returns[0]
                 significant_saving = 100_000
                 better_non_priority = [
-                    f for f in non_priority_returns
+                    f
+                    for f in non_priority_returns
                     if best_priority.price - f.price >= significant_saving
                 ]
                 if better_non_priority:
-                    ordered = better_non_priority + [best_priority] + [
-                        f for f in non_priority_returns if f not in better_non_priority
-                    ]
+                    ordered = (
+                        better_non_priority
+                        + [best_priority]
+                        + [
+                            f
+                            for f in non_priority_returns
+                            if f not in better_non_priority
+                        ]
+                    )
                 else:
                     ordered = [best_priority] + non_priority_returns
             else:
@@ -687,21 +724,29 @@ class AdventureOrchestrator:
             return_options: list[ReturnOption] = []
             priority_price = next((f.price for f in top3 if f.is_priority), None)
             for i, f in enumerate(top3):
-                savings = (priority_price - f.price) if priority_price and not f.is_priority else None
-                return_options.append(ReturnOption(
-                    flight=f,
-                    is_recommended=(i == 0),
-                    savings_vs_priority=savings,
-                ))
+                savings = (
+                    (priority_price - f.price)
+                    if priority_price and not f.is_priority
+                    else None
+                )
+                return_options.append(
+                    ReturnOption(
+                        flight=f,
+                        is_recommended=(i == 0),
+                        savings_vs_priority=savings,
+                    )
+                )
 
-            pairs.append(WeekendPair(
-                window_start=window_start,
-                window_end=window_end,
-                outbound=outbound,
-                return_options=return_options,
-                events=events,
-                sunday_adventure=sunday_adv,
-            ))
+            pairs.append(
+                WeekendPair(
+                    window_start=window_start,
+                    window_end=window_end,
+                    outbound=outbound,
+                    return_options=return_options,
+                    events=events,
+                    sunday_adventure=sunday_adv,
+                )
+            )
 
         return pairs
 
@@ -722,8 +767,9 @@ class AdventureOrchestrator:
         Returns:
             List of WeekendPair (outbound will be None-like, return is the alert).
         """
-        from aventure_tracker.services.flight_tracker import WeekendPair, ReturnOption
         from datetime import timedelta
+
+        from aventure_tracker.services.flight_tracker import ReturnOption, WeekendPair
 
         match_by_window: dict = {}
         for m in weekend_matches:
@@ -752,15 +798,19 @@ class AdventureOrchestrator:
 
             # Create a synthetic "outbound" placeholder pointing to same weekend
             # We reuse the return flight as the "anchor" for display
-            pairs.append(WeekendPair(
-                window_start=window_start,
-                window_end=window_end,
-                outbound=ret_flight,  # anchor for date/window only
-                return_options=[return_option],
-                events=events,
-                sunday_adventure=self._has_sunday_events(events, window_start, window_end),
-                return_only=True,
-            ))
+            pairs.append(
+                WeekendPair(
+                    window_start=window_start,
+                    window_end=window_end,
+                    outbound=ret_flight,  # anchor for date/window only
+                    return_options=[return_option],
+                    events=events,
+                    sunday_adventure=self._has_sunday_events(
+                        events, window_start, window_end
+                    ),
+                    return_only=True,
+                )
+            )
 
         return pairs
 
@@ -938,7 +988,7 @@ async def async_main(args: argparse.Namespace) -> int:
     print(f"Notifications Sent: {result.total_notifications}")
 
     if result.flights_result:
-        print(f"\nFlights:")
+        print("\nFlights:")
         print(f"  Routes checked: {result.flights_result.routes_checked}")
         print(f"  Dates checked: {result.flights_result.dates_checked}")
         print(f"  Flights found: {result.flights_result.flights_found}")
@@ -962,7 +1012,7 @@ async def async_main(args: argparse.Namespace) -> int:
                 )
 
     if result.activities_result:
-        print(f"\nActivities:")
+        print("\nActivities:")
         print(f"  Accounts checked: {result.activities_result.accounts_checked}")
         print(f"  Posts found: {result.activities_result.posts_found}")
         print(f"  Posts processed: {result.activities_result.posts_processed}")

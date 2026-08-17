@@ -140,9 +140,13 @@ class ActivityTrackerService:
 
         # Log deprecation warnings for legacy params
         if wishlist_config_path:
-            logger.warning("wishlist_config_path is deprecated, use destinations_config_path")
+            logger.warning(
+                "wishlist_config_path is deprecated, use destinations_config_path"
+            )
         if done_config_path:
-            logger.warning("done_config_path is deprecated, use destinations_config_path")
+            logger.warning(
+                "done_config_path is deprecated, use destinations_config_path"
+            )
 
         self._accounts: AccountsConfig | None = None
         self._inventory = InventoryManager(

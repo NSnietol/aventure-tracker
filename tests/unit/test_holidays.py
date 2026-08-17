@@ -90,7 +90,9 @@ class TestGetHolidays:
 
         assert holidays1 is holidays2  # Same object
 
-    def test_get_holidays_fallback_to_api(self, holiday_service: HolidayService) -> None:
+    def test_get_holidays_fallback_to_api(
+        self, holiday_service: HolidayService
+    ) -> None:
         """Test fallback to API for years not in config."""
         with patch("requests.get") as mock_get:
             mock_response = MagicMock()
@@ -182,9 +184,7 @@ holidays:
         friday = date(2025, 4, 18)
         assert service.is_bridge_weekend(friday) is True
 
-    def test_not_bridge_weekend_regular(
-        self, holiday_service: HolidayService
-    ) -> None:
+    def test_not_bridge_weekend_regular(self, holiday_service: HolidayService) -> None:
         """Test regular weekend is not a bridge weekend."""
         # March 14, 2025 is a regular Friday (no nearby holidays)
         friday = date(2025, 3, 14)

@@ -26,6 +26,7 @@ EXPLORE_URL_TEMPLATE = (
 # Search Form Locators
 # =============================================================================
 
+
 class SearchFormLocators:
     """Locators for the flight search form."""
 
@@ -60,6 +61,7 @@ class SearchFormLocators:
 # =============================================================================
 # Results Page Locators
 # =============================================================================
+
 
 class ResultsLocators:
     """Locators for the flight search results page."""
@@ -105,6 +107,7 @@ class ResultsLocators:
 # Filters Locators
 # =============================================================================
 
+
 class FiltersLocators:
     """Locators for flight filters."""
 
@@ -135,6 +138,7 @@ class FiltersLocators:
 # Cookie/Consent Locators
 # =============================================================================
 
+
 class ConsentLocators:
     """Locators for cookie consent and other dialogs."""
 
@@ -145,15 +149,3 @@ class ConsentLocators:
 
     # Generic close button
     CLOSE_BUTTON = "button[aria-label='Cerrar']"
-
-
-# =============================================================================
-# Mobile/Responsive Locators (fallbacks)
-# =============================================================================
-
-class MobileLocators:
-    """Locators for mobile view (may appear on narrow viewports)."""
-
-    HAMBURGER_MENU = "button[aria-label='Menú']"
-    BOTTOM_SHEET = "[role='dialog'][aria-modal='true']"
-    BACK_BUTTON = "button[aria-label='Atrás']"

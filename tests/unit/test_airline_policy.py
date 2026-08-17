@@ -1,8 +1,6 @@
 """Tests for AirlinePolicy — airline filtering logic."""
 
-import pytest
 from aventure_tracker.models.flight import AirlinePolicy, AirlineRule
-
 
 ROUTE_THRESHOLD = 300_000  # COP
 
@@ -32,7 +30,9 @@ class TestAirlinePolicyPriorityRule:
         assert ok
 
     def test_multiple_priority_airlines(self) -> None:
-        policy = AirlinePolicy(priority_airlines=["LATAM", "Avianca"], bargain_threshold=110_000)
+        policy = AirlinePolicy(
+            priority_airlines=["LATAM", "Avianca"], bargain_threshold=110_000
+        )
         ok, _ = policy.should_track("Avianca", 250_000, ROUTE_THRESHOLD)
         assert ok
 
@@ -168,6 +168,7 @@ class TestAirlinePolicyFromYaml:
 
     def test_loads_from_routes_yaml(self, tmp_path) -> None:
         from aventure_tracker.models.flight import RoutesConfig
+
         yaml_content = """
 airline_policy:
   priority_airlines: [LATAM]
@@ -195,6 +196,7 @@ routes:
 
     def test_default_policy_when_not_in_yaml(self, tmp_path) -> None:
         from aventure_tracker.models.flight import RoutesConfig
+
         yaml_content = """
 routes:
   - origin: BAQ

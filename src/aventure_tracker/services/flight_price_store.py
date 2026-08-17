@@ -1,7 +1,7 @@
 """Flight price store using YAML for local persistence."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -164,68 +164,6 @@ class FlightHistory:
         return f"{route}_{travel_date.isoformat()}_{departure_time}_{airline_clean}"
 
 
-# Keep RouteHistory for backwards compatibility during migration
-@dataclass
-class RouteHistory:
-    """DEPRECATED: Legacy price history for a route+date.
-
-    Use FlightHistory instead for proper flight tracking.
-    """
-
-    route: str
-    travel_date: date
-    records: list[PriceRecord]
-
-    @property
-    def latest_price(self) -> int | None:
-        if not self.records:
-            return None
-        return self.records[-1].price
-
-    @property
-    def previous_price(self) -> int | None:
-        if len(self.records) < 2:
-            return None
-        return self.records[-2].price
-
-    @property
-    def lowest_price(self) -> int | None:
-        if not self.records:
-            return None
-        return min(r.price for r in self.records)
-
-    @property
-    def price_change(self) -> int | None:
-        if self.latest_price is None or self.previous_price is None:
-            return None
-        return self.latest_price - self.previous_price
-
-    def add_price(self, price: int) -> bool:
-        if self.latest_price == price:
-            return False
-        self.records.append(PriceRecord(price=price, checked_at=datetime.now()))
-        return True
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "route": self.route,
-            "travel_date": self.travel_date.isoformat(),
-            "records": [r.to_dict() for r in self.records],
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "RouteHistory":
-        travel_date = data.get("travel_date")
-        if isinstance(travel_date, str):
-            travel_date = date.fromisoformat(travel_date)
-        records = [PriceRecord.from_dict(r) for r in data.get("records", [])]
-        return cls(
-            route=data.get("route", ""),
-            travel_date=travel_date,
-            records=records,
-        )
-
-
 class FlightPriceStore:
     """Store flight prices in YAML file with unique flight tracking.
 
@@ -243,8 +181,6 @@ class FlightPriceStore:
             path = Path("data/flight_prices.yaml")
         self._path = Path(path)
         self._flights: dict[str, FlightHistory] = {}
-        # Legacy support
-        self._legacy_routes: dict[str, RouteHistory] = {}
         self._load()
 
     def _load(self) -> None:
@@ -262,14 +198,8 @@ class FlightPriceStore:
             for key, entry in data.get("flights", {}).items():
                 self._flights[key] = FlightHistory.from_dict(entry)
 
-            # Load legacy format (routes) for backwards compatibility
-            self._legacy_routes = {}
-            for key, entry in data.get("routes", {}).items():
-                self._legacy_routes[key] = RouteHistory.from_dict(entry)
-
         except Exception:
             self._flights = {}
-            self._legacy_routes = {}
 
     def save(self) -> None:
         """Save history to YAML file."""
@@ -279,10 +209,6 @@ class FlightPriceStore:
             "updated_at": datetime.now().isoformat(),
             "flights": {fid: f.to_dict() for fid, f in self._flights.items()},
         }
-
-        # Keep legacy routes if they exist (for migration period)
-        if self._legacy_routes:
-            data["routes"] = {k: r.to_dict() for k, r in self._legacy_routes.items()}
 
         with open(self._path, "w") as f:
             yaml.dump(
@@ -408,51 +334,7 @@ class FlightPriceStore:
         for key in keys_to_remove:
             del self._flights[key]
 
-        # Also clean legacy routes
-        legacy_to_remove = [
-            k for k, r in self._legacy_routes.items() if r.travel_date < before
-        ]
-        for key in legacy_to_remove:
-            del self._legacy_routes[key]
-
-        return len(keys_to_remove) + len(legacy_to_remove)
-
-    # Legacy methods for backwards compatibility
-    def get_price(self, route: str, travel_date: date) -> int | None:
-        """DEPRECATED: Get price from legacy store."""
-        key = f"{route}_{travel_date.isoformat()}"
-        history = self._legacy_routes.get(key)
-        return history.latest_price if history else None
-
-    def get_previous_price(self, route: str, travel_date: date) -> int | None:
-        """DEPRECATED: Get previous price from legacy store."""
-        key = f"{route}_{travel_date.isoformat()}"
-        history = self._legacy_routes.get(key)
-        return history.previous_price if history else None
-
-    def set_price(self, route: str, travel_date: date, price: int) -> None:
-        """DEPRECATED: Set price in legacy store."""
-        key = f"{route}_{travel_date.isoformat()}"
-        if key not in self._legacy_routes:
-            self._legacy_routes[key] = RouteHistory(
-                route=route,
-                travel_date=travel_date,
-                records=[],
-            )
-        self._legacy_routes[key].add_price(price)
-
-    def get_history(self, route: str, travel_date: date) -> RouteHistory | None:
-        """DEPRECATED: Get legacy route history."""
-        key = f"{route}_{travel_date.isoformat()}"
-        return self._legacy_routes.get(key)
-
-    def get_all_routes(self) -> list[RouteHistory]:
-        """DEPRECATED: Get all legacy routes."""
-        return list(self._legacy_routes.values())
-
-    def get_routes_for_date(self, travel_date: date) -> list[RouteHistory]:
-        """DEPRECATED: Get legacy routes for date."""
-        return [r for r in self._legacy_routes.values() if r.travel_date == travel_date]
+        return len(keys_to_remove)
 
     def get_lowest_prices(self) -> dict[str, int]:
         """Get lowest recorded price for each route."""

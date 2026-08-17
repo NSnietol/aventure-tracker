@@ -2,7 +2,6 @@
 
 from datetime import date
 from io import BytesIO
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -108,9 +107,7 @@ class TestPreprocessImage:
 
         assert result.mode == "L"
 
-    def test_preprocess_resizes_small_images(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_preprocess_resizes_small_images(self, mock_tesseract_available) -> None:
         """Test preprocessing resizes small images."""
         processor = OCRProcessor()
         small_image = Image.new("RGB", (100, 100), color="white")
@@ -119,9 +116,7 @@ class TestPreprocessImage:
 
         assert result.width >= 800
 
-    def test_preprocess_preserves_large_images(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_preprocess_preserves_large_images(self, mock_tesseract_available) -> None:
         """Test preprocessing doesn't shrink large images."""
         processor = OCRProcessor()
         large_image = Image.new("RGB", (1000, 1000), color="white")
@@ -153,9 +148,7 @@ class TestExtractActivityName:
         result = processor._extract_activity_name("rafting en el río")
         assert result == "Rafting"
 
-    def test_extract_returns_none_for_unknown(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_returns_none_for_unknown(self, mock_tesseract_available) -> None:
         """Test returns None for unknown activities."""
         processor = OCRProcessor()
         result = processor._extract_activity_name("fiesta de cumpleaños")
@@ -183,9 +176,7 @@ class TestExtractLocation:
         result = processor._extract_location("tour a guatapé")
         assert result == "Guatapé"
 
-    def test_extract_returns_none_for_unknown(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_returns_none_for_unknown(self, mock_tesseract_available) -> None:
         """Test returns None for unknown locations."""
         processor = OCRProcessor()
         result = processor._extract_location("aventura en el campo")
@@ -210,16 +201,12 @@ class TestExtractPrice:
         processor = OCRProcessor()
         assert processor._extract_price("costo 180000 pesos") == 180000
 
-    def test_extract_with_thousands_separator(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_with_thousands_separator(self, mock_tesseract_available) -> None:
         """Test extracting price with thousands separator."""
         processor = OCRProcessor()
         assert processor._extract_price("precio 85.000") == 85000
 
-    def test_extract_returns_none_for_invalid(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_returns_none_for_invalid(self, mock_tesseract_available) -> None:
         """Test returns None for invalid prices."""
         processor = OCRProcessor()
         assert processor._extract_price("sin precio") is None
@@ -268,9 +255,7 @@ class TestExtractDate:
         assert result.year == 2025
         assert result.month == 3
 
-    def test_extract_returns_none_for_invalid(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_returns_none_for_invalid(self, mock_tesseract_available) -> None:
         """Test returns None for invalid dates."""
         processor = OCRProcessor()
         assert processor._extract_date("sin fecha") is None
@@ -286,9 +271,7 @@ class TestExtractContact:
         assert result is not None
         assert "3001234567" in result
 
-    def test_extract_phone_with_country_code(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_phone_with_country_code(self, mock_tesseract_available) -> None:
         """Test extracting phone with country code."""
         processor = OCRProcessor()
         result = processor._extract_contact("WhatsApp: +57 311 234 5678")
@@ -301,9 +284,7 @@ class TestExtractContact:
         result = processor._extract_contact("info@aventura.co")
         assert result == "info@aventura.co"
 
-    def test_extract_returns_none_for_missing(
-        self, mock_tesseract_available
-    ) -> None:
+    def test_extract_returns_none_for_missing(self, mock_tesseract_available) -> None:
         """Test returns None when no contact found."""
         processor = OCRProcessor()
         assert processor._extract_contact("sin contacto") is None
@@ -358,10 +339,7 @@ class TestExtractActivity:
         """Test extract_activity returns ExtractedActivity."""
         processor = OCRProcessor()
         mock_tesseract_available.image_to_string.return_value = (
-            "Parapente en Medellín\n"
-            "Precio: $150.000\n"
-            "15 de marzo\n"
-            "Tel: 300 123 4567"
+            "Parapente en Medellín\nPrecio: $150.000\n15 de marzo\nTel: 300 123 4567"
         )
 
         result = processor.extract_activity(sample_image)

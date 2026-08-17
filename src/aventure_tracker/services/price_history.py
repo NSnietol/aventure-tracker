@@ -105,7 +105,7 @@ class PriceHistoryDB:
                     first_seen_at TEXT NOT NULL,
                     last_updated_at TEXT NOT NULL
                 );
-                
+
                 CREATE TABLE IF NOT EXISTS price_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     event_id TEXT NOT NULL,
@@ -114,14 +114,14 @@ class PriceHistoryDB:
                     source_image TEXT,
                     FOREIGN KEY (event_id) REFERENCES events(event_id)
                 );
-                
-                CREATE INDEX IF NOT EXISTS idx_price_history_event 
+
+                CREATE INDEX IF NOT EXISTS idx_price_history_event
                     ON price_history(event_id);
-                CREATE INDEX IF NOT EXISTS idx_price_history_date 
+                CREATE INDEX IF NOT EXISTS idx_price_history_date
                     ON price_history(recorded_at);
-                CREATE INDEX IF NOT EXISTS idx_events_agency 
+                CREATE INDEX IF NOT EXISTS idx_events_agency
                     ON events(agency);
-                CREATE INDEX IF NOT EXISTS idx_events_date 
+                CREATE INDEX IF NOT EXISTS idx_events_date
                     ON events(date_start);
             """)
 
@@ -154,8 +154,8 @@ class PriceHistoryDB:
                 # Insert new event
                 conn.execute(
                     """
-                    INSERT INTO events 
-                    (event_id, name, agency, date_start, date_end, current_price, 
+                    INSERT INTO events
+                    (event_id, name, agency, date_start, date_end, current_price,
                      sold_out, first_seen_at, last_updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
@@ -190,7 +190,7 @@ class PriceHistoryDB:
             # Update event
             conn.execute(
                 """
-                UPDATE events 
+                UPDATE events
                 SET name = ?, current_price = ?, sold_out = ?, last_updated_at = ?
                 WHERE event_id = ?
                 """,
@@ -215,7 +215,9 @@ class PriceHistoryDB:
 
                 # Calculate change
                 change_amount = event.price - old_price
-                change_percent = (change_amount / old_price) * 100 if old_price > 0 else 0
+                change_percent = (
+                    (change_amount / old_price) * 100 if old_price > 0 else 0
+                )
 
                 return PriceChange(
                     event_id=event.event_id,
@@ -242,8 +244,8 @@ class PriceHistoryDB:
         with self._get_connection() as conn:
             rows = conn.execute(
                 """
-                SELECT price, recorded_at, source_image 
-                FROM price_history 
+                SELECT price, recorded_at, source_image
+                FROM price_history
                 WHERE event_id = ?
                 ORDER BY recorded_at ASC
                 """,
@@ -327,29 +329,27 @@ class PriceHistoryDB:
         Returns:
             List of PriceChange records.
         """
-        cutoff = datetime.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        cutoff = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         cutoff = cutoff.replace(day=cutoff.day - days)
 
         query = """
-            SELECT 
+            SELECT
                 ph1.event_id,
                 e.name as event_name,
                 ph1.price as new_price,
                 ph1.recorded_at as new_recorded_at,
                 (
-                    SELECT price FROM price_history ph2 
-                    WHERE ph2.event_id = ph1.event_id 
+                    SELECT price FROM price_history ph2
+                    WHERE ph2.event_id = ph1.event_id
                     AND ph2.recorded_at < ph1.recorded_at
-                    ORDER BY ph2.recorded_at DESC 
+                    ORDER BY ph2.recorded_at DESC
                     LIMIT 1
                 ) as old_price,
                 (
-                    SELECT recorded_at FROM price_history ph2 
-                    WHERE ph2.event_id = ph1.event_id 
+                    SELECT recorded_at FROM price_history ph2
+                    WHERE ph2.event_id = ph1.event_id
                     AND ph2.recorded_at < ph1.recorded_at
-                    ORDER BY ph2.recorded_at DESC 
+                    ORDER BY ph2.recorded_at DESC
                     LIMIT 1
                 ) as old_recorded_at
             FROM price_history ph1
@@ -424,9 +424,7 @@ class PriceHistoryDB:
                     (agency,),
                 ).fetchone()[0]
             else:
-                events_count = conn.execute(
-                    "SELECT COUNT(*) FROM events"
-                ).fetchone()[0]
+                events_count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
                 sold_out_count = conn.execute(
                     "SELECT COUNT(*) FROM events WHERE sold_out = 1"
                 ).fetchone()[0]
@@ -434,9 +432,7 @@ class PriceHistoryDB:
                     "SELECT COUNT(*) FROM price_history"
                 ).fetchone()[0]
 
-            agencies = conn.execute(
-                "SELECT DISTINCT agency FROM events"
-            ).fetchall()
+            agencies = conn.execute("SELECT DISTINCT agency FROM events").fetchall()
 
         return {
             "total_events": events_count,

@@ -274,7 +274,9 @@ class DestinationsConfig(BaseModel):
         """
         with open(path, "w", encoding="utf-8") as f:
             f.write("# Destinations Config - Blacklist Only\n")
-            f.write("# Recibes notificaciones de TODOS los planes EXCEPTO los que están aquí.\n\n")
+            f.write(
+                "# Recibes notificaciones de TODOS los planes EXCEPTO los que están aquí.\n\n"
+            )
             yaml.dump(
                 {"blacklist": self.blacklist},
                 f,
@@ -282,49 +284,3 @@ class DestinationsConfig(BaseModel):
                 default_flow_style=False,
                 sort_keys=False,
             )
-
-
-# Keep BlacklistConfig for backward compatibility
-class BlacklistConfig(BaseModel):
-    """Configuration for blacklisted/excluded destinations.
-
-    DEPRECATED: Use DestinationsConfig instead.
-    """
-
-    destinations: list[str] = Field(default_factory=list)
-    entries: list[dict[str, str]] = Field(default_factory=list)
-
-    @classmethod
-    def from_yaml(cls, path: Path) -> "BlacklistConfig":
-        """Load blacklist from a YAML file."""
-        if not path.exists():
-            return cls(destinations=[], entries=[])
-
-        with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        if data is None:
-            return cls(destinations=[], entries=[])
-
-        if data.get("destinations") is None:
-            data["destinations"] = []
-        if data.get("entries") is None:
-            data["entries"] = []
-
-        return cls.model_validate(data)
-
-    def get_all_destinations(self) -> set[str]:
-        """Get all blacklisted destinations as lowercase set."""
-        result = {d.lower().strip() for d in self.destinations}
-        for entry in self.entries:
-            if "destination" in entry:
-                result.add(entry["destination"].lower().strip())
-        return result
-
-    def is_blacklisted(self, text: str) -> tuple[bool, str | None]:
-        """Check if text matches any blacklisted destination."""
-        text_lower = text.lower()
-        for dest in self.get_all_destinations():
-            if dest in text_lower:
-                return True, dest
-        return False, None
