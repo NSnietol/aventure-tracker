@@ -40,7 +40,7 @@ routes:
   # === OUTBOUND (IDA) - Thursday/Friday ===
   - origin: BAQ
     destination: MDE
-    price_threshold: 300000
+    price_threshold: 150000
     drop_percentage: 15
     search_days: [thursday, friday]
 
@@ -54,7 +54,7 @@ routes:
   # === RETURN (VUELTA) - Sunday/Monday ===
   - origin: MDE
     destination: BAQ
-    price_threshold: 300000
+    price_threshold: 150000
     drop_percentage: 15
     search_days: [sunday, monday]
 
