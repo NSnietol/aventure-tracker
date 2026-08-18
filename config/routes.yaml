@@ -26,7 +26,8 @@
 
 airline_policy:
   priority_airlines:
-    - LATAM             # Priority: beneficios/puntos. Include if ≤ route threshold.
+    - LATAM             # Priority: beneficios/puntos. Include if ≤ priority_threshold.
+  priority_threshold: 180000  # LATAM included up to this price (higher than others due to points benefit).
   bargain_threshold: 110000   # Any airline at this price or below is always included.
   extra_airlines:
     - name: Wingo

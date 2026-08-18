@@ -98,15 +98,28 @@ def build_weekend_pairs(
         current = window_start
         while current <= window_end:
             for f in returns_by_date.get(current, []):
-                weekday = f.travel_date.weekday()
-                if weekday == 6:  # Sunday
-                    if sunday_adv:
+                weekday = f.travel_date.weekday()  # 0=Mon 6=Sun
+
+                if sunday_adv:
+                    # Events on Sunday → adventurer can't fly back Sunday night.
+                    # Only Monday returns are valid.
+                    # Tuesday is NOT included unless we know the adventure ends
+                    # Monday in MDE (not tracked yet).
+                    if weekday == 6:  # Sunday
                         logger.debug(
                             f"  Skipping Sunday return {f.travel_date} "
                             f"{f.airline} ${f.price:,} (sunday adventure active)"
                         )
                         continue
-                    else:
+                    if weekday == 1:  # Tuesday
+                        logger.debug(
+                            f"  Skipping Tuesday return {f.travel_date} "
+                            f"{f.airline} ${f.price:,} (sunday adventure → monday only)"
+                        )
+                        continue
+                else:
+                    # Saturday-only adventure: Sunday ≥ 11:00 allowed, Monday ok.
+                    if weekday == 6:
                         try:
                             h, m = map(int, f.departure_time.split(":"))
                             if dtime(h, m) < dtime(11, 0):
@@ -117,9 +130,9 @@ def build_weekend_pairs(
                                 continue
                         except Exception:
                             pass
+
                 candidates.append(f)
             current += timedelta(days=1)
-
         candidates.sort(key=lambda f: f.price)
 
         # LATAM preference: keep priority return unless another is ≥100K cheaper
