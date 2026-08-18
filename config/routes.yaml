@@ -26,7 +26,8 @@
 
 airline_policy:
   priority_airlines:
-    - LATAM             # Priority: beneficios/puntos. Include if ≤ route threshold.
+    - LATAM             # Priority: beneficios/puntos. Include if ≤ priority_threshold.
+  priority_threshold: 180000  # LATAM included up to this price (higher than others due to points benefit).
   bargain_threshold: 110000   # Any airline at this price or below is always included.
   extra_airlines:
     - name: Wingo
@@ -40,7 +41,7 @@ routes:
   # === OUTBOUND (IDA) - Thursday/Friday ===
   - origin: BAQ
     destination: MDE
-    price_threshold: 300000
+    price_threshold: 150000
     drop_percentage: 15
     search_days: [thursday, friday]
 
@@ -54,7 +55,7 @@ routes:
   # === RETURN (VUELTA) - Sunday/Monday ===
   - origin: MDE
     destination: BAQ
-    price_threshold: 300000
+    price_threshold: 150000
     drop_percentage: 15
     search_days: [sunday, monday]
 

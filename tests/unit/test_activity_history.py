@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from aventure_tracker.services.instagram.history import (
+from aventure_tracker.services.events.history import (
     MAX_CHECK_COUNT,
     ActivityHistoryManager,
     ActivityRecord,

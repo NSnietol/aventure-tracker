@@ -60,6 +60,15 @@ class AirlinePolicy(BaseModel):
     """
 
     priority_airlines: list[str] = Field(default_factory=lambda: ["LATAM"])
+    priority_threshold: int | None = Field(
+        default=None,
+        description=(
+            "Max price for priority airlines (e.g. LATAM). "
+            "When set, overrides route price_threshold for priority airlines. "
+            "Useful when priority airlines deserve a slightly higher threshold "
+            "due to loyalty points/benefits."
+        ),
+    )
     bargain_threshold: int = Field(default=110000, gt=0)
     extra_airlines: list[AirlineRule] = Field(default_factory=list)
 
@@ -81,16 +90,21 @@ class AirlinePolicy(BaseModel):
         Returns:
             Tuple of (should_track, reason) for logging.
         """
-        # Rule 1: Priority airline within route threshold
+        # Rule 1: Priority airline — use priority_threshold if set, else route_threshold
         if self.is_priority(airline):
-            if price <= route_threshold:
+            effective_threshold = (
+                self.priority_threshold
+                if self.priority_threshold is not None
+                else route_threshold
+            )
+            if price <= effective_threshold:
                 return (
                     True,
-                    f"priority airline, price ${price:,} ≤ threshold ${route_threshold:,}",
+                    f"priority airline, price ${price:,} ≤ threshold ${effective_threshold:,}",
                 )
             return (
                 False,
-                f"priority airline but price ${price:,} > threshold ${route_threshold:,}",
+                f"priority airline but price ${price:,} > threshold ${effective_threshold:,}",
             )
 
         # Rule 2: Bargain — any airline below absolute floor
