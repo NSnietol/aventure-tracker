@@ -1,10 +1,5 @@
 """Business logic services for Adventure Tracker."""
 
-from aventure_tracker.services.events.activity_service import (
-    ActivityAlert,
-    ActivityTrackerResult,
-    ActivityTrackerService,
-)
 from aventure_tracker.services.events.extractor import (
     EventInfo,
     extract_date_from_text,
@@ -39,11 +34,8 @@ from aventure_tracker.services.shared.holidays import (
 )
 
 __all__ = [
-    "ActivityAlert",
     "ActivityHistoryManager",
     "ActivityRecord",
-    "ActivityTrackerResult",
-    "ActivityTrackerService",
     "CalendarData",
     "EventInfo",
     "ExtractedActivity",

@@ -5,7 +5,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from aventure_tracker.config import Settings
@@ -23,10 +23,6 @@ __all__ = [
     "main",
     "DEFAULT_WEEKS_AHEAD",
 ]
-from aventure_tracker.services.events.activity_service import (
-    ActivityTrackerResult,
-    ActivityTrackerService,
-)
 from aventure_tracker.services.extraction.inbox_processor import run_inbox_extraction
 from aventure_tracker.services.flights.calendar import FlightCalendarDisplay
 from aventure_tracker.services.flights.dates import FlightDateCalculator
@@ -75,7 +71,6 @@ class AdventureOrchestrator:
         self._state_manager: StateManager | None = None
         self._email_notifier: EmailNotifier | None = None
         self._flight_tracker: FlightTrackerService | None = None
-        self._activity_tracker: ActivityTrackerService | None = None
         self._calendar_display: FlightCalendarDisplay | None = None
 
         self._logger = logging.getLogger(__name__)
@@ -164,16 +159,6 @@ class AdventureOrchestrator:
                     weeks_ahead=self._weeks_ahead,
                 )
                 self._logger.info("Flight calendar display initialized")
-
-        if self._mode in (RunMode.ALL, RunMode.ACTIVITIES):
-            self._activity_tracker = ActivityTrackerService(
-                accounts_config_path=self._settings.get_accounts_path(),
-                destinations_config_path=self._settings.get_destinations_path(),
-                state_manager=self._state_manager,
-                notifier=None,
-                use_ocr=True,
-                max_posts_per_account=self._max_posts,
-            )
             self._logger.info("Activity tracker initialized")
 
     # ------------------------------------------------------------------
@@ -188,7 +173,6 @@ class AdventureOrchestrator:
 
         errors: list[str] = []
         flights_result: FlightTrackerResult | None = None
-        activities_result: ActivityTrackerResult | None = None
 
         try:
             await self._init_infrastructure()
@@ -237,25 +221,6 @@ class AdventureOrchestrator:
             if self._show_calendar and self._calendar_display:
                 self._show_flight_calendar()
 
-            if self._activity_tracker:
-                try:
-                    self._logger.info("Running activity tracker...")
-                    since = (
-                        datetime.now() - timedelta(hours=24)
-                        if self._settings.is_ci
-                        else None
-                    )
-                    activities_result = await self._activity_tracker.track_activities(
-                        since=since
-                    )
-                    self._logger.info(
-                        f"Activity tracking complete: {activities_result.alerts_generated} alerts"
-                    )
-                    errors.extend(activities_result.errors)
-                except Exception as e:
-                    errors.append(f"Activity tracker failed: {e}")
-                    self._logger.error(errors[-1])
-
             if self._state_manager:
                 try:
                     self._state_manager.write()
@@ -268,12 +233,8 @@ class AdventureOrchestrator:
             errors.append(f"Orchestrator failed: {e}")
             self._logger.error(errors[-1])
 
-        total_alerts = (flights_result.alerts_generated if flights_result else 0) + (
-            activities_result.alerts_generated if activities_result else 0
-        )
-        total_notifications = (
-            flights_result.notifications_sent if flights_result else 0
-        ) + (activities_result.notifications_sent if activities_result else 0)
+        total_alerts = flights_result.alerts_generated if flights_result else 0
+        total_notifications = flights_result.notifications_sent if flights_result else 0
         duration = (datetime.now() - start_time).total_seconds()
 
         if errors and self._email_notifier:
@@ -282,7 +243,7 @@ class AdventureOrchestrator:
         result = OrchestratorResult(
             mode=self._mode,
             flights_result=flights_result,
-            activities_result=activities_result,
+            activities_result=None,
             total_alerts=total_alerts,
             total_notifications=total_notifications,
             errors=errors,
@@ -558,14 +519,6 @@ async def async_main(args: argparse.Namespace) -> int:
                     f"      {flight.travel_date} {flight.departure_time} "
                     f"{flight.airline}{priority}: ${flight.price:,} COP"
                 )
-
-    if result.activities_result:
-        ar = result.activities_result
-        print("\nActivities:")
-        print(f"  Accounts checked: {ar.accounts_checked}")
-        print(f"  Posts found: {ar.posts_found}")
-        print(f"  Posts processed: {ar.posts_processed}")
-        print(f"  Alerts: {ar.alerts_generated}")
 
     if result.errors:
         print(f"\nErrors ({len(result.errors)}):")

@@ -1,4 +1,4 @@
-updated_at: '2026-08-18T07:40:39.219237'
+updated_at: '2026-08-18T07:50:38.893823'
 flights:
   BAQ-MDE_2026-08-13_18:30_LATAM:
     flight_id: BAQ-MDE_2026-08-13_18:30_LATAM
@@ -240,6 +240,14 @@ flights:
       checked_at: '2026-08-18T07:40:38.151683'
     - price: 100000
       checked_at: '2026-08-18T07:40:38.394381'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:20.293903'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:20.613274'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:37.845493'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:38.061242'
   CTG-MDE_2026-08-13_18:30_LATAM:
     flight_id: CTG-MDE_2026-08-13_18:30_LATAM
     route: CTG-MDE
@@ -474,6 +482,14 @@ flights:
       checked_at: '2026-08-18T07:40:38.151910'
     - price: 100000
       checked_at: '2026-08-18T07:40:38.394589'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:20.294035'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:20.613396'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:37.845611'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:38.061320'
   BAQ-MDE_2026-08-14_11:00_LATAM:
     flight_id: BAQ-MDE_2026-08-14_11:00_LATAM
     route: BAQ-MDE
@@ -576,6 +592,14 @@ flights:
       checked_at: '2026-08-18T07:40:38.151830'
     - price: 100000
       checked_at: '2026-08-18T07:40:38.394495'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:20.293987'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:20.613348'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:37.845548'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:38.061290'
   BAQ-MDE_2026-08-28_11:00_LATAM:
     flight_id: BAQ-MDE_2026-08-28_11:00_LATAM
     route: BAQ-MDE
@@ -762,3 +786,11 @@ flights:
       checked_at: '2026-08-18T07:40:38.151977'
     - price: 100000
       checked_at: '2026-08-18T07:40:38.394671'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:20.294074'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:20.613451'
+    - price: 120000
+      checked_at: '2026-08-18T07:50:37.845675'
+    - price: 100000
+      checked_at: '2026-08-18T07:50:38.061347'
