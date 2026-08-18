@@ -48,6 +48,9 @@ markers = [
     "slow: slow tests",
 ]
 addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::ResourceWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]
