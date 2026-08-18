@@ -3,7 +3,7 @@
 from datetime import date
 from unittest.mock import patch
 
-from aventure_tracker.services.event_extractor import (
+from aventure_tracker.services.instagram.extractor import (
     EventInfo,
     _clean_event_name,
     _infer_year,
@@ -106,7 +106,7 @@ class TestExtractDateFromText:
         result, _ = extract_date_from_text("32 de agosto")
         assert result is None
 
-    @patch("aventure_tracker.services.event_extractor.date")
+    @patch("aventure_tracker.services.instagram.extractor.date")
     def test_infers_next_year_for_past_date(self, mock_date) -> None:
         """Test past dates infer next year."""
         # Mock today as August 20, 2026

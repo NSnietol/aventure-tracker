@@ -301,7 +301,7 @@ class ImageEventExtractor:
         Returns:
             List of ExtractionResult for each image.
         """
-        from aventure_tracker.services.file_organizer import detect_file_type
+        from aventure_tracker.services.extraction.organizer import detect_file_type
 
         directory = Path(directory)
         results: list[ExtractionResult] = []

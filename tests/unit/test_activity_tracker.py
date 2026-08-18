@@ -10,13 +10,13 @@ from aventure_tracker.models.activity import (
     InstagramAccountConfig,
     InstagramPost,
 )
-from aventure_tracker.services.activity_tracker import (
+from aventure_tracker.services.instagram.inventory import MatchResult
+from aventure_tracker.services.instagram.ocr import ExtractedActivity
+from aventure_tracker.services.instagram.tracker import (
     ActivityAlert,
     ActivityTrackerResult,
     ActivityTrackerService,
 )
-from aventure_tracker.services.inventory import MatchResult
-from aventure_tracker.services.ocr import ExtractedActivity
 
 
 @pytest.fixture

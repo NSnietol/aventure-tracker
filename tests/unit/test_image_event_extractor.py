@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from aventure_tracker.services.image_event_extractor import (
+from aventure_tracker.services.extraction.extractor import (
     ExtractionConfig,
     ImageEventExtractor,
     ModelProvider,

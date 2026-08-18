@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from aventure_tracker.models.activity import InstagramPost
-from aventure_tracker.services.inventory import InventoryManager, MatchResult
-from aventure_tracker.services.ocr import ExtractedActivity
+from aventure_tracker.services.instagram.inventory import InventoryManager, MatchResult
+from aventure_tracker.services.instagram.ocr import ExtractedActivity
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from aventure_tracker.models.extracted_event import ExtractedEvent, ExtractionResult
-from aventure_tracker.services.extraction_pipeline import (
+from aventure_tracker.services.extraction.pipeline import (
     ExtractionPipeline,
     PipelineConfig,
     PipelineResult,
@@ -147,7 +147,7 @@ class TestExtractionPipeline:
 
     def test_init_creates_components(self, config: PipelineConfig) -> None:
         """Should initialize all components."""
-        with patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor"):
+        with patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor"):
             pipeline = ExtractionPipeline(config)
 
             assert pipeline.organizer is not None
@@ -164,7 +164,7 @@ class TestExtractionPipeline:
         (tmp_dirs["target"] / "medellinbungee").mkdir()
         (tmp_dirs["target"] / ".hidden").mkdir()
 
-        with patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor"):
+        with patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor"):
             pipeline = ExtractionPipeline(config)
             agencies = pipeline._discover_agencies()
 
@@ -174,13 +174,13 @@ class TestExtractionPipeline:
 
     def test_discover_agencies_empty(self, config: PipelineConfig) -> None:
         """Should return empty list for empty directory."""
-        with patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor"):
+        with patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor"):
             pipeline = ExtractionPipeline(config)
             agencies = pipeline._discover_agencies()
 
         assert agencies == []
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_processes_all_agencies(
         self,
         mock_extractor_cls: MagicMock,
@@ -206,7 +206,7 @@ class TestExtractionPipeline:
         assert result.stats.images_processed == 1
         assert result.stats.events_extracted == 2
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_saves_to_yaml(
         self,
         mock_extractor_cls: MagicMock,
@@ -231,7 +231,7 @@ class TestExtractionPipeline:
         yaml_file = brutal_dir / "events.yaml"
         assert yaml_file.exists()
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_saves_to_database(
         self,
         mock_extractor_cls: MagicMock,
@@ -257,7 +257,7 @@ class TestExtractionPipeline:
         stats = pipeline.price_db.get_statistics()
         assert stats["total_events"] == 2
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_tracks_price_changes(
         self,
         mock_extractor_cls: MagicMock,
@@ -322,7 +322,7 @@ class TestExtractionPipeline:
         assert result.stats.price_changes[0].old_price == 100000
         assert result.stats.price_changes[0].new_price == 120000
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_counts_sold_out(
         self,
         mock_extractor_cls: MagicMock,
@@ -370,7 +370,7 @@ class TestExtractionPipeline:
 
         assert result.stats.events_sold_out == 1
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_counts_needs_review(
         self,
         mock_extractor_cls: MagicMock,
@@ -394,7 +394,7 @@ class TestExtractionPipeline:
         # sample_extraction_result has 1 event with low confidence
         assert result.stats.events_needing_review == 1
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_handles_extraction_errors(
         self,
         mock_extractor_cls: MagicMock,
@@ -427,7 +427,7 @@ class TestExtractionPipeline:
         assert result.stats.images_failed == 1
         assert any("API rate limited" in e for e in result.stats.errors)
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_run_single_agency(
         self,
         mock_extractor_cls: MagicMock,
@@ -457,7 +457,7 @@ class TestExtractionPipeline:
         call_args = mock_extractor.extract_from_directory.call_args
         assert "brutaltravel" in str(call_args)
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_get_extraction_summary(
         self,
         mock_extractor_cls: MagicMock,
@@ -483,7 +483,7 @@ class TestExtractionPipeline:
         assert "Images processed" in summary
         assert "Events extracted" in summary
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_skip_yaml_when_disabled(
         self,
         mock_extractor_cls: MagicMock,
@@ -508,7 +508,7 @@ class TestExtractionPipeline:
         yaml_file = brutal_dir / "events.yaml"
         assert not yaml_file.exists()
 
-    @patch("aventure_tracker.services.extraction_pipeline.ImageEventExtractor")
+    @patch("aventure_tracker.services.extraction.pipeline.ImageEventExtractor")
     def test_skip_db_when_disabled(
         self,
         mock_extractor_cls: MagicMock,
@@ -538,7 +538,7 @@ class TestExtractionPipeline:
 class TestRunExtractionCLI:
     """Tests for CLI entry point."""
 
-    @patch("aventure_tracker.services.extraction_pipeline.ExtractionPipeline")
+    @patch("aventure_tracker.services.extraction.pipeline.ExtractionPipeline")
     @patch("builtins.print")
     def test_run_extraction_cli(
         self,
@@ -570,7 +570,7 @@ class TestRunExtractionCLI:
         assert result == mock_result
         mock_print.assert_called_with("Summary")
 
-    @patch("aventure_tracker.services.extraction_pipeline.ExtractionPipeline")
+    @patch("aventure_tracker.services.extraction.pipeline.ExtractionPipeline")
     @patch("builtins.print")
     def test_run_extraction_cli_single_agency(
         self,

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from aventure_tracker.services.flight_price_store import (
+from aventure_tracker.services.flights.price_store import (
     FlightPriceStore,
     PriceRecord,
 )

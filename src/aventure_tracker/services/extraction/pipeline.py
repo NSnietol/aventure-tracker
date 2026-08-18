@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from aventure_tracker.models.extracted_event import ExtractedEvent, ExtractionResult
-from aventure_tracker.services.file_organizer import FileOrganizer
-from aventure_tracker.services.image_event_extractor import (
+from aventure_tracker.services.extraction.extractor import (
     ExtractionConfig,
     ImageEventExtractor,
 )
-from aventure_tracker.services.price_history import PriceChange, PriceHistoryDB
-from aventure_tracker.services.yaml_event_store import YAMLEventStore
+from aventure_tracker.services.extraction.organizer import FileOrganizer
+from aventure_tracker.services.extraction.yaml_store import YAMLEventStore
+from aventure_tracker.services.shared.price_history import PriceChange, PriceHistoryDB
 
 
 @dataclass

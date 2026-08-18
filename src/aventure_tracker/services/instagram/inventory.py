@@ -8,7 +8,7 @@ from aventure_tracker.models.activity import (
     DestinationsConfig,
     InstagramPost,
 )
-from aventure_tracker.services.ocr import ExtractedActivity
+from aventure_tracker.services.instagram.ocr import ExtractedActivity
 
 logger = logging.getLogger(__name__)
 

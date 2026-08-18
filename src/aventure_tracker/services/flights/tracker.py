@@ -14,9 +14,9 @@ from aventure_tracker.models.flight import (
     SearchDay,
 )
 from aventure_tracker.scrapers.google_flights import GoogleFlightsScraper
-from aventure_tracker.services.flight_dates import FlightDateCalculator
-from aventure_tracker.services.flight_price_store import FlightPriceStore
-from aventure_tracker.services.holidays import HolidayService
+from aventure_tracker.services.flights.dates import FlightDateCalculator
+from aventure_tracker.services.flights.price_store import FlightPriceStore
+from aventure_tracker.services.shared.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 
@@ -447,8 +447,10 @@ class FlightTrackerService:
                                 result.price_alerts.append(alert)
 
                     except Exception as e:
-                        error_msg = f"Error checking {route} on {travel_date}: {e}"
-                        logger.error(error_msg)
+                        # Include exception type so error reports are actionable
+                        error_type = type(e).__name__
+                        error_msg = f"[{error_type}] {route} on {travel_date}: {e}"
+                        logger.error(error_msg, exc_info=True)
                         result.errors.append(error_msg)
 
         logger.info(

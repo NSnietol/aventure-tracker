@@ -11,8 +11,8 @@ import pytest
 
 from aventure_tracker.config import Settings
 from aventure_tracker.main import AdventureOrchestrator, RunMode
-from aventure_tracker.services.activity_tracker import ActivityTrackerResult
-from aventure_tracker.services.flight_tracker import FlightTrackerResult
+from aventure_tracker.services.flights.tracker import FlightTrackerResult
+from aventure_tracker.services.instagram.tracker import ActivityTrackerResult
 
 
 @pytest.fixture
@@ -316,8 +316,8 @@ class TestServiceIntegration:
         self, integration_config: Path
     ) -> None:
         """Test flight date calculator uses holiday configuration."""
-        from aventure_tracker.services.flight_dates import FlightDateCalculator
-        from aventure_tracker.services.holidays import HolidayService
+        from aventure_tracker.services.flights.dates import FlightDateCalculator
+        from aventure_tracker.services.shared.holidays import HolidayService
 
         holiday_service = HolidayService(
             config_path=integration_config / "holidays.yaml"
@@ -334,7 +334,7 @@ class TestServiceIntegration:
 
     def test_inventory_manager_with_config(self, integration_config: Path) -> None:
         """Test inventory manager loads configuration files."""
-        from aventure_tracker.services.inventory import InventoryManager
+        from aventure_tracker.services.instagram.inventory import InventoryManager
 
         # Create a destinations.yaml file for the test
         destinations_file = integration_config / "destinations.yaml"

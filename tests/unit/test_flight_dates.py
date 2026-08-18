@@ -7,14 +7,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from aventure_tracker.models.flight import WeekendTrip
-from aventure_tracker.services.flight_dates import (
+from aventure_tracker.services.flights.dates import (
     FRIDAY_DAYTIME,
     MONDAY_MORNING,
     THURSDAY_EVENING,
     TUESDAY_MORNING,
     FlightDateCalculator,
 )
-from aventure_tracker.services.holidays import HolidayService
+from aventure_tracker.services.shared.holidays import HolidayService
 
 
 @pytest.fixture

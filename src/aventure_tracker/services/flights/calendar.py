@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from aventure_tracker.models.flight import RouteConfig, WeekendTrip
-from aventure_tracker.services.flight_dates import FlightDateCalculator
+from aventure_tracker.services.flights.dates import FlightDateCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ class FlightCalendarDisplay:
     def _get_date_calculator(self) -> FlightDateCalculator:
         """Get or create the date calculator."""
         if self._date_calculator is None:
-            from aventure_tracker.services.holidays import HolidayService
+            from aventure_tracker.services.shared.holidays import HolidayService
 
             holiday_service = HolidayService()
             self._date_calculator = FlightDateCalculator(

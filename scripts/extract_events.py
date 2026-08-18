@@ -28,12 +28,12 @@ def process_single_image(args: tuple) -> dict:
     Returns:
         Dict with results.
     """
-    from aventure_tracker.services.image_event_extractor import (
+    from aventure_tracker.services.extraction.extractor import (
         ImageEventExtractor,
         ExtractionConfig,
         ModelProvider,
     )
-    from aventure_tracker.services.extraction_cache import ExtractionCache
+    from aventure_tracker.services.extraction.cache import ExtractionCache
     
     image_path, agency, month, provider, cache_path, force = args
     
@@ -86,9 +86,9 @@ def run_extraction_parallel(
         force: If True, ignore cache and reprocess all images.
         cache_path: Path to cache file.
     """
-    from aventure_tracker.services.file_organizer import detect_file_type
-    from aventure_tracker.services.image_event_extractor import ModelProvider
-    from aventure_tracker.services.extraction_cache import ExtractionCache
+    from aventure_tracker.services.extraction.organizer import detect_file_type
+    from aventure_tracker.services.extraction.extractor import ModelProvider
+    from aventure_tracker.services.extraction.cache import ExtractionCache
     
     model_provider = ModelProvider.GEMINI if provider == "gemini" else ModelProvider.OLLAMA
     
@@ -252,7 +252,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    from aventure_tracker.services.extraction_cache import ExtractionCache
+    from aventure_tracker.services.extraction.cache import ExtractionCache
     
     cache_path = Path("data/extraction_cache.yaml")
     cache = ExtractionCache(cache_path)
