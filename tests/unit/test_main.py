@@ -15,8 +15,8 @@ from aventure_tracker.main import (
     async_main,
     create_parser,
 )
+from aventure_tracker.services.events.activity_service import ActivityTrackerResult
 from aventure_tracker.services.flights.tracker import FlightTrackerResult
-from aventure_tracker.services.instagram.tracker import ActivityTrackerResult
 
 
 @pytest.fixture

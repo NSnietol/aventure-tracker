@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from aventure_tracker.services.instagram.ocr import (
+from aventure_tracker.services.events.ocr import (
     ExtractedActivity,
     ImageDownloadError,
     OCRError,
@@ -26,7 +26,7 @@ def sample_image() -> Image.Image:
 @pytest.fixture
 def mock_pytesseract():
     """Mock pytesseract module."""
-    with patch("aventure_tracker.services.instagram.ocr.pytesseract") as mock:
+    with patch("aventure_tracker.services.events.ocr.pytesseract") as mock:
         mock.get_tesseract_version.return_value = "5.0.0"
         mock.image_to_string.return_value = "Sample OCR text"
         yield mock
@@ -35,8 +35,8 @@ def mock_pytesseract():
 @pytest.fixture
 def mock_tesseract_available():
     """Mock Tesseract as available."""
-    with patch("aventure_tracker.services.instagram.ocr.TESSERACT_AVAILABLE", True):
-        with patch("aventure_tracker.services.instagram.ocr.pytesseract") as mock:
+    with patch("aventure_tracker.services.events.ocr.TESSERACT_AVAILABLE", True):
+        with patch("aventure_tracker.services.events.ocr.pytesseract") as mock:
             mock.get_tesseract_version.return_value = "5.0.0"
             mock.image_to_string.return_value = "Sample text"
             yield mock
@@ -63,9 +63,7 @@ class TestOCRProcessorInit:
 
     def test_init_raises_when_tesseract_unavailable(self) -> None:
         """Test that init raises when Tesseract unavailable."""
-        with patch(
-            "aventure_tracker.services.instagram.ocr.TESSERACT_AVAILABLE", False
-        ):
+        with patch("aventure_tracker.services.events.ocr.TESSERACT_AVAILABLE", False):
             with pytest.raises(TesseractNotAvailableError):
                 OCRProcessor()
 

@@ -11,8 +11,8 @@ import pytest
 
 from aventure_tracker.config import Settings
 from aventure_tracker.main import AdventureOrchestrator, RunMode
+from aventure_tracker.services.events.activity_service import ActivityTrackerResult
 from aventure_tracker.services.flights.tracker import FlightTrackerResult
-from aventure_tracker.services.instagram.tracker import ActivityTrackerResult
 
 
 @pytest.fixture
@@ -334,7 +334,7 @@ class TestServiceIntegration:
 
     def test_inventory_manager_with_config(self, integration_config: Path) -> None:
         """Test inventory manager loads configuration files."""
-        from aventure_tracker.services.instagram.inventory import InventoryManager
+        from aventure_tracker.services.events.inventory import InventoryManager
 
         # Create a destinations.yaml file for the test
         destinations_file = integration_config / "destinations.yaml"

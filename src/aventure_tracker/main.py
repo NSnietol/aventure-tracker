@@ -13,6 +13,10 @@ from pathlib import Path
 from aventure_tracker.config import Settings
 from aventure_tracker.infrastructure.email_notifier import EmailNotifier
 from aventure_tracker.infrastructure.state_manager import StateManager
+from aventure_tracker.services.events.activity_service import (
+    ActivityTrackerResult,
+    ActivityTrackerService,
+)
 from aventure_tracker.services.flights.calendar import (
     FlightCalendarDisplay,
 )
@@ -21,10 +25,6 @@ from aventure_tracker.services.flights.matcher import EventMatcher
 from aventure_tracker.services.flights.tracker import (
     FlightTrackerResult,
     FlightTrackerService,
-)
-from aventure_tracker.services.instagram.tracker import (
-    ActivityTrackerResult,
-    ActivityTrackerService,
 )
 from aventure_tracker.services.shared.holidays import HolidayService
 
