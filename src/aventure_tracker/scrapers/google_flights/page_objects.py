@@ -7,6 +7,9 @@ from datetime import date
 from playwright.async_api import Page
 
 from aventure_tracker.scrapers.google_flights.locators import (
+    ANIMATION_PAUSE_MS,
+    INTERACTION_TIMEOUT_MS,
+    RESULTS_TIMEOUT_MS,
     ConsentLocators,
     FiltersLocators,
     ResultsLocators,
@@ -57,14 +60,14 @@ class SearchForm:
             # Click on origin input area
             origin_input = await self._page.wait_for_selector(
                 SearchFormLocators.ORIGIN_INPUT,
-                timeout=5000,
+                timeout=INTERACTION_TIMEOUT_MS,
             )
             if origin_input:
                 await origin_input.click()
                 await origin_input.fill("")
                 await self._page.keyboard.type(airport_code, delay=100)
                 # Wait for autocomplete and select first option
-                await self._page.wait_for_timeout(500)
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
                 await self._page.keyboard.press("ArrowDown")
                 await self._page.keyboard.press("Enter")
                 logger.debug(f"Set origin: {airport_code}")
@@ -81,13 +84,13 @@ class SearchForm:
         try:
             dest_input = await self._page.wait_for_selector(
                 SearchFormLocators.DESTINATION_INPUT,
-                timeout=5000,
+                timeout=INTERACTION_TIMEOUT_MS,
             )
             if dest_input:
                 await dest_input.click()
                 await dest_input.fill("")
                 await self._page.keyboard.type(airport_code, delay=100)
-                await self._page.wait_for_timeout(500)
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
                 await self._page.keyboard.press("ArrowDown")
                 await self._page.keyboard.press("Enter")
                 logger.debug(f"Set destination: {airport_code}")
@@ -104,13 +107,15 @@ class SearchForm:
         try:
             date_input = await self._page.wait_for_selector(
                 SearchFormLocators.DEPARTURE_DATE_INPUT,
-                timeout=5000,
+                timeout=INTERACTION_TIMEOUT_MS,
             )
             if date_input:
                 await date_input.click()
                 # Select date from calendar
                 date_selector = f"[data-iso='{travel_date.isoformat()}']"
-                await self._page.wait_for_selector(date_selector, timeout=5000)
+                await self._page.wait_for_selector(
+                    date_selector, timeout=INTERACTION_TIMEOUT_MS
+                )
                 await self._page.click(date_selector)
 
                 # Click done button if present
@@ -136,7 +141,7 @@ class SearchForm:
             )
             if dropdown:
                 await dropdown.click()
-                await self._page.wait_for_timeout(300)
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
                 await self._page.click(SearchFormLocators.ONE_WAY_OPTION)
                 logger.debug("Selected one-way trip")
         except Exception as e:
@@ -147,7 +152,7 @@ class SearchForm:
         try:
             search_btn = await self._page.wait_for_selector(
                 SearchFormLocators.SEARCH_BUTTON,
-                timeout=5000,
+                timeout=INTERACTION_TIMEOUT_MS,
             )
             if search_btn:
                 await search_btn.click()
@@ -163,7 +168,7 @@ class ResultsPage:
     def __init__(self, page: Page) -> None:
         self._page = page
 
-    async def wait_for_results(self, timeout_ms: int = 30000) -> bool:
+    async def wait_for_results(self, timeout_ms: int = RESULTS_TIMEOUT_MS) -> bool:
         """Wait for results to load.
 
         Args:
@@ -511,9 +516,9 @@ class FiltersPanel:
             dropdown = await self._page.query_selector(FiltersLocators.STOPS_DROPDOWN)
             if dropdown:
                 await dropdown.click()
-                await self._page.wait_for_timeout(300)
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
                 await self._page.click(FiltersLocators.NONSTOP_OPTION)
-                await self._page.wait_for_timeout(500)
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
                 logger.debug("Applied nonstop filter")
         except Exception as e:
             logger.debug(f"Could not apply nonstop filter: {e}")
