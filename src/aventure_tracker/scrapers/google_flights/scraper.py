@@ -178,11 +178,19 @@ class GoogleFlightsScraper(BaseScraper):
                 logger.info(f"Found {len(results)} flights for {route}")
 
             except NavigationError:
-                logger.error(f"Navigation failed for {route}")
+                logger.error(
+                    f"Navigation failed for {route} on {travel_date}", exc_info=True
+                )
                 raise
             except Exception as e:
-                logger.error(f"Scraping error for {route}: {e}")
-                raise ScraperError(f"Failed to scrape {route}: {e}") from e
+                error_type = type(e).__name__
+                logger.error(
+                    f"[{error_type}] Scraping error for {route} on {travel_date}: {e}",
+                    exc_info=True,
+                )
+                raise ScraperError(
+                    f"[{error_type}] Failed to scrape {route} on {travel_date}: {e}"
+                ) from e
 
         return results
 

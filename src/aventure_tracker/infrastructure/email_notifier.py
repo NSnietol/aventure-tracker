@@ -795,55 +795,92 @@ def _build_error_html(
     """
     error_count = len(errors)
 
-    # Classify each error as CRÍTICO vs WARN heuristically:
-    # - First error is always CRÍTICO (it usually caused the cascade)
-    # - Errors mentioning "warning", "warn", "failed to sync", "no response" → WARN
-    # - Everything else → CRÍTICO
+    # Classify each error as CRÍTICO vs WARN based on exception type prefix [ExceptionType]
+    # or heuristic keywords as fallback
     _warn_keywords = ("warning", "warn", "failed to sync", "no response", "skipping")
+    _timeout_types = ("TimeoutError", "PlaywrightTimeoutError", "TimeoutException")
+    _network_types = ("NetworkError", "ConnectionError", "NavigationError")
 
-    def _severity(idx: int, msg: str) -> str:
+    def _severity(idx: int, msg: str) -> tuple[str, str]:
+        """Returns (severity, category_label)."""
+        # Extract [ExceptionType] prefix if present
+        import re
+
+        type_match = re.match(r"^\[(\w+)\]", msg)
+        if type_match:
+            exc_type = type_match.group(1)
+            if any(t in exc_type for t in _timeout_types):
+                return "warn", "TIMEOUT"
+            if any(t in exc_type for t in _network_types):
+                return "critical", "RED"
+            if "Scraper" in exc_type:
+                return "critical", "SCRAPER"
+
         if idx == 0:
-            return "critical"
+            return "critical", "CRÍTICO"
         msg_lower = msg.lower()
         if any(k in msg_lower for k in _warn_keywords):
-            return "warn"
-        return "critical"
+            return "warn", "WARN"
+        if "timeout" in msg_lower:
+            return "warn", "TIMEOUT"
+        return "critical", "CRÍTICO"
 
     # Build error rows
     error_rows = ""
     for idx, error in enumerate(errors):
-        sev = _severity(idx, error)
+        sev, badge_text = _severity(idx, error)
         if sev == "critical":
             border_color = "#dc2626"
             badge_bg = "#fee2e2"
             badge_color = "#dc2626"
-            badge_text = "CRÍTICO"
             label_color = "#dc2626"
         else:
             border_color = "#f59e0b"
             badge_bg = "#fef3c7"
             badge_color = "#d97706"
-            badge_text = "WARN"
             label_color = "#d97706"
 
-        # Split "Module: message" if the error has that pattern
+        # Parse "[ExceptionType] component: message" format
+        import re as _re
+
+        type_prefix = ""
         module = ""
         message = error
-        if ": " in error and len(error.split(": ", 1)[0]) < 40:
-            parts = error.split(": ", 1)
+
+        # Extract [ExceptionType] prefix
+        type_m = _re.match(r"^\[(\w+)\]\s*(.*)", error)
+        if type_m:
+            type_prefix = type_m.group(1)
+            remainder = type_m.group(2)
+        else:
+            remainder = error
+
+        # Extract "component: message" from remainder
+        if ": " in remainder and len(remainder.split(": ", 1)[0]) < 50:
+            parts = remainder.split(": ", 1)
             module_candidate = parts[0].strip()
-            # Only treat as module label if it looks like a component name (no spaces or short)
-            if " " not in module_candidate or len(module_candidate.split()) <= 3:
+            if " " not in module_candidate or len(module_candidate.split()) <= 4:
                 module = module_candidate
                 message = parts[1].strip()
+            else:
+                message = remainder
+        else:
+            message = remainder
+
+        # Show exception type as prefix to module label
+        label = (
+            f"[{type_prefix}] {module}"
+            if type_prefix and module
+            else (f"[{type_prefix}]" if type_prefix else module)
+        )
 
         module_html = (
             (
                 f'<div style="font-size:11px;color:{label_color};font-family:Arial,sans-serif;'
                 f'font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">'
-                f"{module}</div>"
+                f"{label}</div>"
             )
-            if module
+            if label
             else ""
         )
 
