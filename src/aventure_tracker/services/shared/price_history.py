@@ -6,7 +6,7 @@ and changes across multiple extraction runs.
 
 import sqlite3
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -330,7 +330,7 @@ class PriceHistoryDB:
             List of PriceChange records.
         """
         cutoff = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        cutoff = cutoff.replace(day=cutoff.day - days)
+        cutoff = cutoff - timedelta(days=days)
 
         query = """
             SELECT
