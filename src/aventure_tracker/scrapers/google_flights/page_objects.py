@@ -497,8 +497,9 @@ class ResultsPage:
                 logger.debug("Skipping round-trip card in one-way search")
                 return None
 
-            # Extract price: "desde NNNNNN pesos colombianos"
-            price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label)
+            # Extract price: "Desde NNNNNN pesos" (one-way) or
+            # "desde NNNNNN pesos" (round-trip — already filtered above)
+            price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label, re.IGNORECASE)
             if price_match:
                 result["price"] = int(price_match.group(1))
 
