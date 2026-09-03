@@ -56,7 +56,7 @@ class SearchFormLocators:
     ONE_WAY_OPTION = "[data-value='2']"
     ROUND_TRIP_OPTION = "[data-value='1']"
 
-    SEARCH_BUTTON = "button[aria-label*='Buscar'], button[aria-label*='Explorar']"
+    SEARCH_BUTTON = "button[aria-label='Buscar'], button[jsname='c6xFrd']"
 
 
 # =============================================================================

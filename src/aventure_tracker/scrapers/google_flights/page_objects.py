@@ -208,9 +208,8 @@ class SearchForm:
     async def submit_search(self) -> None:
         """Click the search button."""
         try:
-            search_btn = await self._page.wait_for_selector(
-                SearchFormLocators.SEARCH_BUTTON,
-                timeout=INTERACTION_TIMEOUT_MS,
+            search_btn = await self._find_visible_input(
+                SearchFormLocators.SEARCH_BUTTON
             )
             if search_btn:
                 await search_btn.click()
