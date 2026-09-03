@@ -257,15 +257,15 @@ class GoogleFlightsScraper(BaseScraper):
 
                 # Fill the form: origin, destination, dates
                 await form.set_origin(outbound_route.origin)
-                await self._add_human_delay(300, 600)
+                await self._add_human_delay(800, 1200)
                 await form.set_destination(outbound_route.destination)
-                await self._add_human_delay(300, 600)
+                await self._add_human_delay(800, 1200)
                 await form.set_departure_date(outbound_date)
-                await self._add_human_delay(300, 600)
+                await self._add_human_delay(500, 800)
                 await form.set_return_date(return_date)
-                await self._add_human_delay(300, 600)
+                await self._add_human_delay(500, 800)
                 await form.submit_search()
-                await self._add_human_delay(1500, 2500)
+                await self._add_human_delay(2000, 3000)
 
                 results_page = ResultsPage(page)
                 if not await results_page.wait_for_results():

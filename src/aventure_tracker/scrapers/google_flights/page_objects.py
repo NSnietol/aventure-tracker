@@ -83,6 +83,8 @@ class SearchForm:
             airport_code: IATA airport code (e.g., "MDE").
         """
         try:
+            # Wait for any open autocomplete from origin to close first
+            await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
             dest_input = await self._page.wait_for_selector(
                 SearchFormLocators.DESTINATION_INPUT,
                 timeout=INTERACTION_TIMEOUT_MS,
