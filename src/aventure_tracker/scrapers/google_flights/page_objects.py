@@ -149,15 +149,21 @@ class SearchForm:
                     f"document.querySelector(\"[data-iso='{travel_date.isoformat()}']\").click()"
                 )
 
-                # Click done button if present
+                # Click done button if present — use JS to avoid overlay
                 try:
                     done_btn = await self._page.query_selector(
                         SearchFormLocators.CALENDAR_DONE_BUTTON
                     )
                     if done_btn:
-                        await done_btn.click()
+                        await self._page.evaluate(
+                            f"document.querySelector('{SearchFormLocators.CALENDAR_DONE_BUTTON}')?.click()"
+                        )
                 except Exception:
                     pass
+
+                # Press Escape to close any remaining dialog/modal
+                await self._page.keyboard.press("Escape")
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
 
                 logger.debug(f"Set departure date: {travel_date}")
         except Exception as e:
@@ -189,7 +195,11 @@ class SearchForm:
                 SearchFormLocators.RETURN_DATE_INPUT
             )
             if return_input:
-                await return_input.click()
+                # Use JS click to bypass any overlay (price chart modal) that
+                # may still be open after departure date selection
+                await self._page.evaluate(
+                    f'document.querySelector("{SearchFormLocators.RETURN_DATE_INPUT}")?.click()'
+                )
                 date_selector = f"[data-iso='{return_date.isoformat()}']"
                 await self._page.wait_for_selector(
                     date_selector, timeout=INTERACTION_TIMEOUT_MS
