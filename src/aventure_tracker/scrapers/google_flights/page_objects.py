@@ -140,12 +140,14 @@ class SearchForm:
             )
             if date_input:
                 await date_input.click()
-                # Select date from calendar
+                # Select date from calendar — use JS click to bypass overlay elements
                 date_selector = f"[data-iso='{travel_date.isoformat()}']"
                 await self._page.wait_for_selector(
                     date_selector, timeout=INTERACTION_TIMEOUT_MS
                 )
-                await self._page.click(date_selector)
+                await self._page.evaluate(
+                    f"document.querySelector(\"[data-iso='{travel_date.isoformat()}']\").click()"
+                )
 
                 # Click done button if present
                 try:
@@ -192,7 +194,9 @@ class SearchForm:
                 await self._page.wait_for_selector(
                     date_selector, timeout=INTERACTION_TIMEOUT_MS
                 )
-                await self._page.click(date_selector)
+                await self._page.evaluate(
+                    f"document.querySelector(\"[data-iso='{return_date.isoformat()}']\").click()"
+                )
                 try:
                     done_btn = await self._page.query_selector(
                         SearchFormLocators.CALENDAR_DONE_BUTTON
