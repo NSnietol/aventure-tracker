@@ -647,13 +647,19 @@ class FlightTrackerService:
                                 result.price_alerts.append(alert)
 
                             # Convert return_options to FlightFound and add to results.
-                            # return_date is already known from the search parameters —
-                            # we don't need to parse it from the aria-label.
+                            # return_date is already known from the search parameters.
+                            #
+                            # PRICE NOTE: Google only shows a combined RT total — it
+                            # does not break down the price per leg on the return screen.
+                            # We use the outbound total as the return price too so that
+                            # build_weekend_pairs can compare options by total cost.
+                            # Duplicates (same flight from multiple outbound searches)
+                            # are deduplicated by flight_id; the cheapest total wins.
+                            seen_ret_ids: set[str] = set()
                             for ret in returns:
                                 ret_time = ret.get("departure_time", "")
                                 ret_airline = ret.get("airline", "Unknown")
-                                ret_price = ret.get("price")
-                                if not ret_time or not ret_price:
+                                if not ret_time:
                                     continue
 
                                 # Validate return time window
@@ -667,26 +673,32 @@ class FlightTrackerService:
                                     )
                                     continue
 
+                                ret_flight_id = (
+                                    f"RT_{return_route.origin}-{return_route.destination}"
+                                    f"_{return_date}_{ret_time}_{ret_airline}"
+                                )
                                 ret_is_priority = self._is_priority_airline(ret_airline)
                                 ret_found = FlightFound(
-                                    flight_id=(
-                                        f"RT_{return_route.origin}-{return_route.destination}"
-                                        f"_{return_date}_{ret_time}_{ret_airline}"
-                                    ),
+                                    flight_id=ret_flight_id,
                                     route=f"{return_route.origin}→{return_route.destination}",
                                     travel_date=return_date,
                                     departure_time=ret_time,
                                     airline=ret_airline,
-                                    # Store per-leg estimate: total minus outbound price.
-                                    # Google shows total RT price on the return screen too,
-                                    # so we store it as-is for relative comparisons.
-                                    price=ret_price,
+                                    # Use the combined RT total as the return price.
+                                    # This makes build_weekend_pairs sort/compare returns
+                                    # by the real total cost of choosing that return flight.
+                                    price=total,
                                     is_priority=ret_is_priority,
                                 )
                                 logger.debug(
                                     f"    Return option: {return_date} {ret_time} "
-                                    f"{ret_airline} ${ret_price:,}"
+                                    f"{ret_airline} (RT total ${total:,})"
                                 )
+                                # Deduplicate within this pair's return list
+                                if ret_flight_id in seen_ret_ids:
+                                    continue
+                                seen_ret_ids.add(ret_flight_id)
+
                                 result.prices_found.append(ret_found)
 
                                 ret_alert = self._create_alert(ret_found, return_route)
