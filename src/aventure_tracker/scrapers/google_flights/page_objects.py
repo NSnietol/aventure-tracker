@@ -147,6 +147,36 @@ class SearchForm:
         except Exception as e:
             logger.debug(f"Could not select one-way: {e}")
 
+    async def set_return_date(self, return_date: date) -> None:
+        """Set the return date for round-trip search.
+
+        Args:
+            return_date: The return travel date.
+        """
+        try:
+            return_input = await self._page.wait_for_selector(
+                SearchFormLocators.RETURN_DATE_INPUT,
+                timeout=INTERACTION_TIMEOUT_MS,
+            )
+            if return_input:
+                await return_input.click()
+                date_selector = f"[data-iso='{return_date.isoformat()}']"
+                await self._page.wait_for_selector(
+                    date_selector, timeout=INTERACTION_TIMEOUT_MS
+                )
+                await self._page.click(date_selector)
+                try:
+                    done_btn = await self._page.query_selector(
+                        SearchFormLocators.CALENDAR_DONE_BUTTON
+                    )
+                    if done_btn:
+                        await done_btn.click()
+                except Exception:
+                    pass
+                logger.debug(f"Set return date: {return_date}")
+        except Exception as e:
+            logger.warning(f"Failed to set return date {return_date}: {e}")
+
     async def submit_search(self) -> None:
         """Click the search button."""
         try:
