@@ -541,7 +541,26 @@ def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
     try:
-        return asyncio.run(async_main(args))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(async_main(args))
+        finally:
+            try:
+                # Cancel pending tasks so subprocess transports are closed
+                # before the loop closes — prevents RuntimeError: Event loop is closed
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.run_until_complete(loop.shutdown_default_executor())
+            finally:
+                asyncio.set_event_loop(None)
+                loop.close()
     except KeyboardInterrupt:
         print("\nInterrupted by user")
         return 130

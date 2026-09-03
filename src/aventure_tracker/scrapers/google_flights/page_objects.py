@@ -489,6 +489,14 @@ class ResultsPage:
                 "stops": 0,
             }
 
+            # Skip round-trip cards in one-way searches.
+            # Google sometimes returns combined round-trip prices even for
+            # one-way queries. Those prices are ~2x the real one-way price
+            # and must not be compared against the per-leg threshold.
+            if "ida y vuelta" in aria_label.lower():
+                logger.debug("Skipping round-trip card in one-way search")
+                return None
+
             # Extract price: "desde NNNNNN pesos colombianos"
             price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label)
             if price_match:
