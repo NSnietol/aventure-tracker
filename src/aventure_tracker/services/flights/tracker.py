@@ -136,6 +136,37 @@ class WeekendPair:
 
 
 @dataclass
+class RoundTripResult:
+    """A matched outbound+return pair from a round-trip search.
+
+    Contains both legs as found in a single Google Flights round-trip search.
+    The price is the combined total for both legs.
+
+    Attributes:
+        outbound: The outbound flight (e.g., BAQ→MDE on Thursday).
+        return_flight: The return flight (e.g., MDE→BAQ on Monday).
+        total_price: Combined price for both legs in COP.
+        outbound_href: Full Google Flights URL with outbound flight encoded,
+            used to navigate to the return screen.
+    """
+
+    outbound: FlightFound
+    return_flight: FlightFound
+    total_price: int
+    outbound_href: str = ""
+
+    @property
+    def outbound_price_estimate(self) -> int:
+        """Estimated outbound leg price (total / 2 — approximate)."""
+        return self.total_price // 2
+
+    @property
+    def return_price_estimate(self) -> int:
+        """Estimated return leg price (total / 2 — approximate)."""
+        return self.total_price // 2
+
+
+@dataclass
 class PriceAlert:
     """Price alert for a flight.
 
@@ -347,6 +378,7 @@ class FlightTrackerService:
 
         Checks all configured routes for upcoming weekends and generates
         alerts for prices below threshold or significant drops.
+        Routes with search_mode=round_trip are paired and searched together.
 
         Returns:
             FlightTrackerResult with tracking statistics.
@@ -368,102 +400,234 @@ class FlightTrackerService:
             errors=[],
         )
 
-        for route in routes.routes:
-            logger.info(f"Checking route: {route}")
-            result.routes_checked += 1
+        from aventure_tracker.models.flight import SearchMode
 
-            for weekend in weekends:
-                # Get dates to check from route configuration
-                for search_day in route.search_days:
-                    travel_date = weekend.get_date_for_day(search_day)
-                    result.dates_checked += 1
+        # Separate one-way and round-trip routes
+        oneway_routes = [
+            r for r in routes.routes if r.search_mode == SearchMode.ONE_WAY
+        ]
+        rt_routes = [r for r in routes.routes if r.search_mode == SearchMode.ROUND_TRIP]
 
-                    try:
-                        # Use scrape() to get full flight details
-                        flights = await scraper.scrape(route, travel_date)
+        # Process one-way routes (existing logic)
+        for route in oneway_routes:
+            await self._track_oneway_route(route, weekends, scraper, result)
 
-                        if not flights:
-                            logger.info(
-                                f"  {route} {travel_date} ({search_day.value}): No flights found"
-                            )
-                            continue
+        # Process round-trip route pairs
+        # Pair BAQ→MDE with MDE→BAQ by matching origin/destination
+        processed_rt: set[str] = set()
+        for outbound_route in rt_routes:
+            key = f"{outbound_route.origin}-{outbound_route.destination}"
+            if key in processed_rt:
+                continue
+            # Find the matching return route
+            return_route = next(
+                (
+                    r
+                    for r in rt_routes
+                    if r.origin == outbound_route.destination
+                    and r.destination == outbound_route.origin
+                ),
+                None,
+            )
+            if return_route is None:
+                logger.warning(
+                    f"No return route found for {outbound_route} — skipping round-trip"
+                )
+                continue
 
-                        # Filter and process flights
-                        for flight in flights:
-                            # Check time filter
-                            departure_time_str = flight.departure_time.strftime("%H:%M")
-                            if not self._is_valid_time_for_day(
-                                departure_time_str, search_day
-                            ):
-                                logger.debug(
-                                    f"    Skipping {flight.airline} {departure_time_str}: "
-                                    f"outside time window for {search_day.value}"
-                                )
-                                continue
+            processed_rt.add(key)
+            processed_rt.add(f"{return_route.origin}-{return_route.destination}")
 
-                            # Check airline policy
-                            if not self._should_track_flight(flight, route):
-                                continue
-
-                            # Create unique flight ID
-                            route_str = f"{route.origin}-{route.destination}"
-                            is_priority = self._is_priority_airline(flight.airline)
-
-                            flight_found = FlightFound(
-                                flight_id=f"{route_str}_{travel_date}_{departure_time_str}_{flight.airline}",
-                                route=str(route),
-                                travel_date=travel_date,
-                                departure_time=departure_time_str,
-                                airline=flight.airline,
-                                price=flight.price,
-                                is_priority=is_priority,
-                            )
-
-                            # Log the flight
-                            priority_marker = "★" if is_priority else ""
-                            logger.info(
-                                f"  {route} {travel_date} {departure_time_str} "
-                                f"{flight.airline}{priority_marker}: ${flight.price:,} COP"
-                            )
-
-                            result.flights_found += 1
-                            result.prices_found.append(flight_found)
-
-                            # Save to price store
-                            self._price_store.set_flight_price(
-                                route=route_str,
-                                travel_date=travel_date,
-                                departure_time=departure_time_str,
-                                airline=flight.airline,
-                                price=flight.price,
-                            )
-
-                            # Create alert — but DON'T send individual notification
-                            # Notification is sent by orchestrator after full scan
-                            alert = self._create_alert(flight_found, route)
-                            if alert.should_notify:
-                                result.alerts_generated += 1
-                                # Store alert for orchestrator to handle
-                                result.price_alerts.append(alert)
-
-                    except Exception as e:
-                        # Include exception type so error reports are actionable
-                        error_type = type(e).__name__
-                        error_msg = f"[{error_type}] {route} on {travel_date}: {e}"
-                        logger.error(error_msg, exc_info=True)
-                        result.errors.append(error_msg)
+            await self._track_round_trip_pair(
+                outbound_route, return_route, weekends, scraper, result
+            )
 
         logger.info(
             f"Flight tracking complete: {result.routes_checked} routes, "
             f"{result.dates_checked} dates, {result.flights_found} flights, "
             f"{result.alerts_generated} alerts"
         )
-
-        # Save prices to local YAML store
         self._price_store.save()
         logger.info("Flight prices saved to local store")
-
         return result
+
+    async def _track_oneway_route(
+        self,
+        route: "RouteConfig",
+        weekends: list,
+        scraper: "GoogleFlightsScraper",
+        result: "FlightTrackerResult",
+    ) -> None:
+        """Track a single one-way route across all upcoming weekends."""
+        logger.info(f"Checking route: {route}")
+        result.routes_checked += 1
+
+        for weekend in weekends:
+            for search_day in route.search_days:
+                travel_date = weekend.get_date_for_day(search_day)
+                result.dates_checked += 1
+
+                try:
+                    flights = await scraper.scrape(route, travel_date)
+
+                    if not flights:
+                        logger.info(
+                            f"  {route} {travel_date} ({search_day.value}): No flights found"
+                        )
+                        continue
+
+                    for flight in flights:
+                        departure_time_str = flight.departure_time.strftime("%H:%M")
+                        if not self._is_valid_time_for_day(
+                            departure_time_str, search_day
+                        ):
+                            logger.debug(
+                                f"    Skipping {flight.airline} {departure_time_str}: "
+                                f"outside time window for {search_day.value}"
+                            )
+                            continue
+
+                        if not self._should_track_flight(flight, route):
+                            continue
+
+                        route_str = f"{route.origin}-{route.destination}"
+                        is_priority = self._is_priority_airline(flight.airline)
+
+                        flight_found = FlightFound(
+                            flight_id=f"{route_str}_{travel_date}_{departure_time_str}_{flight.airline}",
+                            route=str(route),
+                            travel_date=travel_date,
+                            departure_time=departure_time_str,
+                            airline=flight.airline,
+                            price=flight.price,
+                            is_priority=is_priority,
+                        )
+
+                        priority_marker = "★" if is_priority else ""
+                        logger.info(
+                            f"  {route} {travel_date} {departure_time_str} "
+                            f"{flight.airline}{priority_marker}: ${flight.price:,} COP"
+                        )
+
+                        result.flights_found += 1
+                        result.prices_found.append(flight_found)
+
+                        self._price_store.set_flight_price(
+                            route=route_str,
+                            travel_date=travel_date,
+                            departure_time=departure_time_str,
+                            airline=flight.airline,
+                            price=flight.price,
+                        )
+
+                        alert = self._create_alert(flight_found, route)
+                        if alert.should_notify:
+                            result.alerts_generated += 1
+                            result.price_alerts.append(alert)
+
+                except Exception as e:
+                    error_type = type(e).__name__
+                    error_msg = f"[{error_type}] {route} on {travel_date}: {e}"
+                    logger.error(error_msg, exc_info=True)
+                    result.errors.append(error_msg)
+
+    async def _track_round_trip_pair(
+        self,
+        outbound_route: "RouteConfig",
+        return_route: "RouteConfig",
+        weekends: list,
+        scraper: "GoogleFlightsScraper",
+        result: "FlightTrackerResult",
+    ) -> None:
+        """Track a paired outbound+return route using round-trip search."""
+        logger.info(f"Checking round-trip: {outbound_route} ↔ {return_route.origin}")
+        result.routes_checked += 2  # counts both legs
+
+        for weekend in weekends:
+            for outbound_day in outbound_route.search_days:
+                outbound_date = weekend.get_date_for_day(outbound_day)
+
+                for return_day in outbound_route.return_days:
+                    return_date = weekend.get_date_for_day(return_day)
+                    result.dates_checked += 1
+
+                    try:
+                        pairs = await scraper.scrape_round_trip(
+                            outbound_route=outbound_route,
+                            outbound_date=outbound_date,
+                            return_date=return_date,
+                            return_route=return_route,
+                        )
+
+                        if not pairs:
+                            logger.info(
+                                f"  RT {outbound_route} {outbound_date}↔{return_date}: "
+                                f"No pairs found"
+                            )
+                            continue
+
+                        threshold = outbound_route.effective_round_trip_threshold
+
+                        for pair in pairs:
+                            total = pair.get("total_price", 0)
+                            if total <= 0 or total > threshold:
+                                logger.debug(
+                                    f"    Skipping RT pair: total ${total:,} > "
+                                    f"threshold ${threshold:,}"
+                                )
+                                continue
+
+                            out = pair["outbound"]
+                            returns = pair.get("return_options", [])
+
+                            out_time = out.get("departure_time", "")
+                            if not self._is_valid_time_for_day(out_time, outbound_day):
+                                logger.debug(
+                                    f"    Skipping outbound {out.get('airline')} "
+                                    f"{out_time}: outside time window"
+                                )
+                                continue
+
+                            is_priority = self._is_priority_airline(
+                                out.get("airline", "")
+                            )
+
+                            outbound_found = FlightFound(
+                                flight_id=(
+                                    f"RT_{outbound_route.origin}-{outbound_route.destination}"
+                                    f"_{outbound_date}_{out_time}_{out.get('airline', '')}"
+                                ),
+                                route=str(outbound_route),
+                                travel_date=outbound_date,
+                                departure_time=out_time,
+                                airline=out.get("airline", "Unknown"),
+                                price=total,  # total round-trip price
+                                is_priority=is_priority,
+                            )
+
+                            priority_marker = "★" if is_priority else ""
+                            logger.info(
+                                f"  RT {outbound_route} {outbound_date} {out_time} "
+                                f"{out.get('airline')}{priority_marker} ↔ {return_date}: "
+                                f"${total:,} COP total ({len(returns)} return options)"
+                            )
+
+                            result.flights_found += 1
+                            result.prices_found.append(outbound_found)
+
+                            alert = self._create_alert(outbound_found, outbound_route)
+                            if alert.should_notify:
+                                result.alerts_generated += 1
+                                result.price_alerts.append(alert)
+
+                    except Exception as e:
+                        error_type = type(e).__name__
+                        error_msg = (
+                            f"[{error_type}] RT {outbound_route} "
+                            f"{outbound_date}↔{return_date}: {e}"
+                        )
+                        logger.error(error_msg, exc_info=True)
+                        result.errors.append(error_msg)
 
     def _create_alert(
         self,

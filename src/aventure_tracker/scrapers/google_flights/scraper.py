@@ -194,6 +194,140 @@ class GoogleFlightsScraper(BaseScraper):
 
         return results
 
+    async def scrape_round_trip(
+        self,
+        outbound_route: "RouteConfig",
+        outbound_date: date,
+        return_date: date,
+        return_route: "RouteConfig | None" = None,
+    ) -> list[dict]:
+        """Scrape round-trip flights: outbound options + return options per outbound.
+
+        Flow (matches real Google Flights UX):
+        1. Navigate to round-trip search URL (BAQ→MDE outbound_date, MDE→BAQ return_date)
+        2. Extract outbound flight cards — each has an href encoding the selected flight
+        3. For each candidate outbound card, navigate to its href
+        4. Extract return flight options from the second screen
+        5. Return list of round-trip pairs
+
+        Args:
+            outbound_route: Route config for the outbound leg (e.g., BAQ→MDE).
+            outbound_date: Date for the outbound flight.
+            return_date: Date for the return flight.
+            return_route: Route config for the return leg. Defaults to the
+                reverse of outbound_route.
+
+        Returns:
+            List of dicts, each containing:
+                'outbound': flight dict (price=total_round_trip, airline, departure_time, href)
+                'return_options': list of flight dicts for return leg
+                'total_price': combined round-trip price (same as outbound['price'])
+        """
+        if return_route is None:
+            # Create a synthetic reverse route for filtering
+            import copy
+
+            return_route = copy.copy(outbound_route)
+            return_route = outbound_route.model_copy(
+                update={
+                    "origin": outbound_route.destination,
+                    "destination": outbound_route.origin,
+                }
+            )
+
+        url = self._build_search_url(
+            outbound_route.origin,
+            outbound_route.destination,
+            outbound_date,
+            return_date=return_date,
+        )
+
+        results: list[dict] = []
+
+        async with self.browser_session() as page:
+            try:
+                consent = ConsentHandler(page)
+                logger.info(
+                    f"Round-trip search: {outbound_route} on {outbound_date} "
+                    f"↔ {return_date}"
+                )
+                await self.navigate(url, wait_until="networkidle")
+                await consent.dismiss_consent_if_present()
+                await self._add_human_delay(1000, 2000)
+
+                results_page = ResultsPage(page)
+                if not await results_page.wait_for_results():
+                    logger.warning("No round-trip results found")
+                    return results
+
+                # Step 1: Get outbound cards with their hrefs
+                outbound_cards = await results_page.get_flight_details_with_hrefs()
+                logger.info(f"Found {len(outbound_cards)} outbound options")
+
+                for outbound_data in outbound_cards[:5]:  # Check top 5 outbound options
+                    href = outbound_data.get("href", "")
+                    if not href or "ida y vuelta" not in str(
+                        outbound_data.get("_raw_aria", "")
+                    ):
+                        # Still include even if no ida y vuelta marker — it's a round-trip search
+                        pass
+
+                    if not href:
+                        logger.debug("No href for outbound card, skipping")
+                        continue
+
+                    # Step 2: Navigate to the outbound-selected URL to get return options
+                    try:
+                        logger.info(
+                            f"  Selecting outbound: {outbound_data.get('airline')} "
+                            f"{outbound_data.get('departure_time')} ${outbound_data.get('price', 0):,}"
+                        )
+                        await self.navigate(href, wait_until="networkidle")
+                        await self._add_human_delay(800, 1500)
+
+                        return_page = ResultsPage(page)
+                        if not await return_page.wait_for_results(timeout_ms=10000):
+                            logger.debug(
+                                "No return results for this outbound, skipping"
+                            )
+                            continue
+
+                        return_flights = await return_page.get_flight_details()
+                        logger.info(f"  Found {len(return_flights)} return options")
+
+                        results.append(
+                            {
+                                "outbound": outbound_data,
+                                "return_options": return_flights,
+                                "total_price": outbound_data.get("price", 0),
+                            }
+                        )
+
+                        # Go back to outbound list for next iteration
+                        await page.go_back()
+                        await self._add_human_delay(500, 1000)
+                        await results_page.wait_for_results(timeout_ms=8000)
+
+                    except Exception as e:
+                        logger.warning(
+                            f"  Failed to get return options for outbound card: {e}"
+                        )
+                        # Try to go back and continue
+                        try:
+                            await page.go_back()
+                            await self._add_human_delay(500, 1000)
+                        except Exception:
+                            pass
+                        continue
+
+            except Exception as e:
+                error_type = type(e).__name__
+                logger.error(
+                    f"[{error_type}] Round-trip scraping error: {e}", exc_info=True
+                )
+
+        return results
+
     async def get_cheapest_price(
         self,
         route: RouteConfig,

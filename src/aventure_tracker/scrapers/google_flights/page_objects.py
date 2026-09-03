@@ -287,6 +287,55 @@ class ResultsPage:
 
         return flights
 
+    async def get_flight_details_with_hrefs(self) -> list[dict]:
+        """Extract flight details including the href for each card.
+
+        In round-trip mode, each outbound card is an <a> link whose href
+        encodes the selected flight in the tfs= parameter. Navigating to
+        that URL shows the return flight screen for that specific outbound.
+
+        Returns:
+            List of flight detail dicts, each including an 'href' key.
+        """
+        flights: list[dict] = []
+
+        try:
+            # Each result card is a <li> containing an <a role="link">
+            cards = await self._page.query_selector_all(
+                ResultsLocators.FLIGHT_LIST_ITEM
+            )
+
+            for card in cards[:10]:
+                try:
+                    flight = await self._extract_flight_from_card(card)
+                    if not flight:
+                        continue
+                    # Extract href from the link element inside the card
+                    link = await card.query_selector(
+                        "a[href*='tfs='], [role='link'][data-gs]"
+                    )
+                    if link:
+                        href = await link.get_attribute("href")
+                        if href:
+                            flight["href"] = (
+                                href
+                                if href.startswith("http")
+                                else f"https://www.google.com{href}"
+                            )
+                    if "href" not in flight:
+                        flight["href"] = ""
+                    flights.append(flight)
+                except Exception as e:
+                    logger.debug(f"Could not extract flight with href: {e}")
+                    continue
+
+            logger.debug(f"Extracted {len(flights)} flight details with hrefs")
+
+        except Exception as e:
+            logger.error(f"Error extracting flight details with hrefs: {e}")
+
+        return flights
+
     async def _extract_flight_from_card(self, card) -> dict | None:
         """Extract flight info from a result card.
 

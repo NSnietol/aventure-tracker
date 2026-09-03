@@ -1,34 +1,23 @@
 # =============================================================================
 # Flight Routes Configuration
 # =============================================================================
-# Define the flight routes to monitor for price alerts.
-# All prices are ONE-WAY (solo ida).
+# search_mode options:
+#   one_way     — search each leg independently, compare per-leg vs price_threshold
+#   round_trip  — search outbound+return together, compare total vs round_trip_threshold
 #
-# Fields:
-#   - origin: Airport IATA code (e.g., BAQ for Barranquilla)
-#   - destination: Airport IATA code (e.g., MDE for Medellín)
-#   - price_threshold: Maximum price in COP to trigger notification (per leg)
-#   - drop_percentage: Minimum price drop % to trigger notification
-#   - search_days: Days to search (thursday, friday, saturday, sunday, monday)
+# For round_trip mode:
+#   - Pair BAQ→MDE with MDE→BAQ (matched by origin/destination)
+#   - round_trip_threshold: max combined price (defaults to 2 × price_threshold)
+#   - return_days: valid days for the return leg
 
 # =============================================================================
 # Airline Policy
 # =============================================================================
-# Controls which airlines are included and at what price thresholds.
-#
-# Decision order (first match wins):
-#   1. Priority airlines  → include if price ≤ route price_threshold
-#   2. Bargain threshold  → include ANY airline if price ≤ bargain_threshold
-#   3. Extra airlines     → per-airline rules with custom max_price
-#
-# Add airlines to extra_airlines at any time — no restart needed.
-# Set max_price: null to always include regardless of price.
-
 airline_policy:
   priority_airlines:
-    - LATAM             # Priority: beneficios/puntos. Include if ≤ priority_threshold.
-  priority_threshold: 180000  # LATAM included up to this price (higher than others due to points benefit).
-  bargain_threshold: 110000   # Any airline at this price or below is always included.
+    - LATAM             # Priority: include if ≤ priority_threshold.
+  priority_threshold: 180000  # LATAM threshold (higher due to points benefit).
+  bargain_threshold: 110000   # Any airline always included if price ≤ this.
   extra_airlines:
     - name: Wingo
       max_price: 150000
@@ -38,30 +27,40 @@ airline_policy:
       max_price: 150000
 
 routes:
-  # === OUTBOUND (IDA) - Thursday/Friday ===
+  # === ROUND-TRIP: BAQ ↔ MDE ===
+  # Outbound Thu/Fri, return Sun/Mon — searched as a single round-trip query.
+  # Total price compared against round_trip_threshold (300k = ~150k per leg).
   - origin: BAQ
     destination: MDE
-    price_threshold: 150000
+    price_threshold: 150000         # per-leg fallback (used for one_way compatibility)
+    round_trip_threshold: 300000    # max combined price for round-trip search
     drop_percentage: 15
+    search_mode: round_trip
     search_days: [thursday, friday]
+    return_days: [sunday, monday]
 
-  # CTG-MDE disabled: travel time from Barranquilla not worth it unless very cheap
-  # - origin: CTG
-  #   destination: MDE
-  #   price_threshold: 100000  # Only if <= 100k COP
-  #   drop_percentage: 15
-  #   search_days: [thursday, friday]
-
-  # === RETURN (VUELTA) - Sunday/Monday ===
   - origin: MDE
     destination: BAQ
     price_threshold: 150000
+    round_trip_threshold: 300000
     drop_percentage: 15
+    search_mode: round_trip
     search_days: [sunday, monday]
+    return_days: [thursday, friday]
 
-  # MDE-CTG disabled: return route for CTG (disabled above)
-  # - origin: MDE
-  #   destination: CTG
-  #   price_threshold: 100000
+  # === ONE-WAY FALLBACK (disabled — uncomment to use) ===
+  # Use these if round-trip mode has issues, for comparison, or for
+  # routes that don't have a natural round-trip partner.
+  # - origin: BAQ
+  #   destination: MDE
+  #   price_threshold: 150000
   #   drop_percentage: 15
+  #   search_mode: one_way
+  #   search_days: [thursday, friday]
+  #
+  # - origin: MDE
+  #   destination: BAQ
+  #   price_threshold: 150000
+  #   drop_percentage: 15
+  #   search_mode: one_way
   #   search_days: [sunday, monday]
