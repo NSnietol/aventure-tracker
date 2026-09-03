@@ -262,18 +262,29 @@ class GoogleFlightsScraper(BaseScraper):
 
                 # Step 1: Get outbound cards with their hrefs
                 outbound_cards = await results_page.get_flight_details_with_hrefs()
-                logger.info(f"Found {len(outbound_cards)} outbound options")
+                logger.info(
+                    f"Found {len(outbound_cards)} outbound options "
+                    f"({sum(1 for c in outbound_cards if c.get('href'))} with href)"
+                )
 
                 for outbound_data in outbound_cards[:5]:  # Check top 5 outbound options
                     href = outbound_data.get("href", "")
-                    if not href or "ida y vuelta" not in str(
-                        outbound_data.get("_raw_aria", "")
-                    ):
-                        # Still include even if no ida y vuelta marker — it's a round-trip search
-                        pass
 
                     if not href:
-                        logger.debug("No href for outbound card, skipping")
+                        # No href extracted — still record as outbound-only result
+                        # (return options will be empty; tracker will handle pairing separately)
+                        logger.debug(
+                            f"  Outbound card without href: "
+                            f"{outbound_data.get('airline')} "
+                            f"${outbound_data.get('price', 0):,} — recorded without return options"
+                        )
+                        results.append(
+                            {
+                                "outbound": outbound_data,
+                                "return_options": [],
+                                "total_price": outbound_data.get("price", 0),
+                            }
+                        )
                         continue
 
                     # Step 2: Navigate to the outbound-selected URL to get return options
