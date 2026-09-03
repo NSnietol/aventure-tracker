@@ -272,47 +272,41 @@ class GoogleFlightsScraper(BaseScraper):
                     logger.warning("No round-trip results found")
                     return results
 
-                # Step 1: Get outbound cards with their hrefs
+                # Step 1: Get outbound card data from aria-labels
                 outbound_cards = await results_page.get_flight_details_with_hrefs()
-                logger.info(
-                    f"Found {len(outbound_cards)} outbound options "
-                    f"({sum(1 for c in outbound_cards if c.get('href'))} with href)"
-                )
+                logger.info(f"Found {len(outbound_cards)} outbound options")
 
                 for outbound_data in outbound_cards[:5]:  # Check top 5 outbound options
-                    href = outbound_data.get("href", "")
+                    card_index = outbound_data.get("_card_index", -1)
 
-                    if not href:
-                        # No href extracted — still record as outbound-only result
-                        # (return options will be empty; tracker will handle pairing separately)
-                        logger.debug(
-                            f"  Outbound card without href: "
-                            f"{outbound_data.get('airline')} "
-                            f"${outbound_data.get('price', 0):,} — recorded without return options"
-                        )
-                        results.append(
-                            {
-                                "outbound": outbound_data,
-                                "return_options": [],
-                                "total_price": outbound_data.get("price", 0),
-                            }
-                        )
-                        continue
-
-                    # Step 2: Navigate to the outbound-selected URL to get return options
+                    # Step 2: Click the card by index, wait for navigation to return screen
                     try:
                         logger.info(
-                            f"  Selecting outbound: {outbound_data.get('airline')} "
-                            f"{outbound_data.get('departure_time')} ${outbound_data.get('price', 0):,}"
+                            f"  Selecting outbound #{card_index}: "
+                            f"{outbound_data.get('airline')} "
+                            f"{outbound_data.get('departure_time')} "
+                            f"${outbound_data.get('price', 0):,}"
                         )
-                        await self.navigate(href, wait_until="networkidle")
-                        await self._add_human_delay(800, 1500)
+                        # Re-query cards (DOM may have changed)
+                        cards_now = await page.query_selector_all(
+                            "[role='link'][aria-label*='pesos colombianos']"
+                        )
+                        if card_index >= len(cards_now):
+                            logger.debug(f"  Card index {card_index} out of range")
+                            continue
+
+                        await cards_now[card_index].click()
+                        await self._add_human_delay(1500, 2500)
 
                         return_page = ResultsPage(page)
-                        if not await return_page.wait_for_results(timeout_ms=10000):
+                        if not await return_page.wait_for_results(timeout_ms=12000):
                             logger.debug(
                                 "No return results for this outbound, skipping"
                             )
+                            # Go back and try next card
+                            await page.go_back()
+                            await self._add_human_delay(800, 1200)
+                            await results_page.wait_for_results(timeout_ms=8000)
                             continue
 
                         return_flights = await return_page.get_flight_details()
@@ -326,16 +320,15 @@ class GoogleFlightsScraper(BaseScraper):
                             }
                         )
 
-                        # Go back to outbound list for next iteration
+                        # Go back to outbound list for next card
                         await page.go_back()
-                        await self._add_human_delay(500, 1000)
+                        await self._add_human_delay(800, 1200)
                         await results_page.wait_for_results(timeout_ms=8000)
 
                     except Exception as e:
                         logger.warning(
-                            f"  Failed to get return options for outbound card: {e}"
+                            f"  Failed to get return options for card {card_index}: {e}"
                         )
-                        # Try to go back and continue
                         try:
                             await page.go_back()
                             await self._add_human_delay(500, 1000)

@@ -349,45 +349,38 @@ class ResultsPage:
         return flights
 
     async def get_flight_details_with_hrefs(self) -> list[dict]:
-        """Extract flight details including the href for each card.
+        """Extract flight details for round-trip outbound selection.
 
-        In round-trip mode, each outbound card is an <a> link whose href
-        encodes the selected flight in the tfs= parameter. Navigating to
-        that URL shows the return flight screen for that specific outbound.
+        Flight cards are <div role="link" jsaction="click:..."> elements
+        with NO href attribute — the URL is generated dynamically on click.
+        We extract flight data from aria-labels and store the card index
+        so scrape_round_trip can click them by position.
 
         Returns:
-            List of flight detail dicts, each including an 'href' key.
+            List of flight detail dicts. Each dict has an 'href' key
+            (empty string — click-based navigation is used instead).
         """
         flights: list[dict] = []
 
         try:
-            # Each result card is a <li> containing an <a role="link">
+            # Flight cards are <div role="link"> with aria-label containing price info
             cards = await self._page.query_selector_all(
-                ResultsLocators.FLIGHT_LIST_ITEM
+                "[role='link'][aria-label*='pesos colombianos']"
             )
+            logger.debug(f"Found {len(cards)} flight card elements")
 
-            for card in cards[:10]:
+            for i, card in enumerate(cards[:8]):
                 try:
-                    flight = await self._extract_flight_from_card(card)
+                    aria = await card.get_attribute("aria-label") or ""
+                    flight = self._parse_aria_label(aria)
                     if not flight:
                         continue
-                    # Extract href from the link element inside the card
-                    link = await card.query_selector(
-                        "a[href*='tfs='], [role='link'][data-gs]"
-                    )
-                    if link:
-                        href = await link.get_attribute("href")
-                        if href:
-                            flight["href"] = (
-                                href
-                                if href.startswith("http")
-                                else f"https://www.google.com{href}"
-                            )
-                    if "href" not in flight:
-                        flight["href"] = ""
+                    # No href available — caller must click by card index
+                    flight["href"] = ""
+                    flight["_card_index"] = i
                     flights.append(flight)
                 except Exception as e:
-                    logger.debug(f"Could not extract flight with href: {e}")
+                    logger.debug(f"Could not extract flight card {i}: {e}")
                     continue
 
             logger.debug(f"Extracted {len(flights)} flight details with hrefs")
