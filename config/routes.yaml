@@ -27,15 +27,15 @@ airline_policy:
       max_price: 150000
 
 routes:
-  # === ONE-WAY: BAQ → MDE (outbound Thu/Fri) ===
-  # search_mode: one_way — each leg searched independently.
-  # Switch to round_trip when scrape_round_trip() is stable.
+  # === ROUND-TRIP: BAQ ↔ MDE ===
+  # Outbound Thu/Fri, return Sun/Mon.
+  # Total price compared against round_trip_threshold (300k = ~150k per leg).
   - origin: BAQ
     destination: MDE
     price_threshold: 150000
     round_trip_threshold: 300000
     drop_percentage: 15
-    search_mode: one_way
+    search_mode: round_trip
     search_days: [thursday, friday]
     return_days: [sunday, monday]
 
@@ -44,26 +44,22 @@ routes:
     price_threshold: 150000
     round_trip_threshold: 300000
     drop_percentage: 15
-    search_mode: one_way
+    search_mode: round_trip
     search_days: [sunday, monday]
     return_days: [thursday, friday]
 
-  # === ROUND-TRIP (disabled — scrape_round_trip form interaction needs work) ===
-  # Uncomment when form-based search or tfs= URL generation is stable.
+  # === ONE-WAY FALLBACK (disabled) ===
+  # Uncomment to compare or debug individual legs.
   # - origin: BAQ
   #   destination: MDE
   #   price_threshold: 150000
-  #   round_trip_threshold: 300000
   #   drop_percentage: 15
-  #   search_mode: round_trip
+  #   search_mode: one_way
   #   search_days: [thursday, friday]
-  #   return_days: [sunday, monday]
   #
   # - origin: MDE
   #   destination: BAQ
   #   price_threshold: 150000
-  #   round_trip_threshold: 300000
   #   drop_percentage: 15
-  #   search_mode: round_trip
+  #   search_mode: one_way
   #   search_days: [sunday, monday]
-  #   return_days: [thursday, friday]
