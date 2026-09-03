@@ -61,6 +61,23 @@ class Settings(BaseSettings):
         description="Override max_price for all extra_airlines rules (COP).",
     )
 
+    @field_validator(
+        "flight_price_threshold",
+        "flight_bargain_threshold",
+        "flight_extra_max_price",
+        mode="before",
+    )
+    @classmethod
+    def empty_string_to_none(cls, v: object) -> object:
+        """Convert empty string env vars to None before int parsing.
+
+        CI secrets that are not set arrive as empty strings ''.
+        Pydantic can't parse '' as int, so we convert to None first.
+        """
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     # GitHub Gist configuration
     gist_id: str = Field(
         default="",

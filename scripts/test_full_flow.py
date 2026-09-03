@@ -23,8 +23,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from aventure_tracker.models.activity import InstagramAccountConfig, InstagramPost
 from aventure_tracker.models.flight import RouteConfig, WeekendTrip
-from aventure_tracker.services.instagram.history import ActivityHistoryManager
-from aventure_tracker.services.instagram.extractor import extract_event_info
+from aventure_tracker.services.events.history import ActivityHistoryManager
+from aventure_tracker.services.events.extractor import extract_event_info
 from aventure_tracker.services.flights.calendar import FlightCalendarDisplay
 from aventure_tracker.services.flights.dates import FlightDateCalculator
 from aventure_tracker.services.shared.holidays import HolidayService
