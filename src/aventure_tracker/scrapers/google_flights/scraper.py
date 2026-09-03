@@ -245,64 +245,17 @@ class GoogleFlightsScraper(BaseScraper):
                     f"↔ {return_date}"
                 )
 
-                # Step 1: Navigate using the one-way URL (which works reliably).
-                # The outbound_date is already in the URL. The return_date needs
-                # to be added by switching to round-trip mode via the combobox.
-                oneway_url = self._build_search_url(
-                    outbound_route.origin,
-                    outbound_route.destination,
-                    outbound_date,
-                )
-                await self.navigate(oneway_url, wait_until="networkidle")
+                # Step 1: Navigate without 'solo ida' — Google defaults to round-trip mode
+                # and shows combined outbound+return prices (which is what we want).
+                from urllib.parse import quote as _quote
+
+                date_str = outbound_date.strftime("%Y-%m-%d")
+                query = f"Vuelos de {outbound_route.origin} a {outbound_route.destination} el {date_str}"
+                rt_url = f"{BASE_URL}?q={_quote(query)}&curr={self._currency}&hl={self._language}"
+                await self.navigate(rt_url, wait_until="networkidle")
                 await consent.dismiss_consent_if_present()
                 await self._add_human_delay(1000, 1500)
-
-                # Step 2: Switch to round-trip via the trip-type combobox.
-                # The combobox is in the search bar at the top — scroll to top first.
-                try:
-                    await page.evaluate("window.scrollTo(0, 0)")
-                    await self._add_human_delay(300, 500)
-
-                    # Click the combobox to open the trip-type dropdown
-                    combobox = await page.query_selector(
-                        "[aria-label*='tipo de boleto'], "
-                        "[data-value='2']"  # data-value='2' = Solo ida (currently selected)
-                    )
-                    if combobox:
-                        await page.evaluate(
-                            "document.querySelector(\"[aria-label*='tipo de boleto']\")?.click()"
-                        )
-                        await self._add_human_delay(300, 500)
-                        # Select "Ida y vuelta" option (data-value="1")
-                        await page.evaluate(
-                            "document.querySelector(\"[role='option'][data-value='1']\")?.click()"
-                        )
-                        await self._add_human_delay(500, 800)
-
-                    # Step 3: Set the return date
-                    await page.evaluate(
-                        "document.querySelector(\"input[aria-label='Regreso'], "
-                        "input[placeholder='Regreso']\")?.click()"
-                    )
-                    await self._add_human_delay(500, 800)
-                    date_sel = f"[data-iso='{return_date.isoformat()}']"
-                    try:
-                        await page.wait_for_selector(date_sel, timeout=5000)
-                        await page.evaluate(
-                            f"document.querySelector(\"[data-iso='{return_date.isoformat()}']\")?.click()"
-                        )
-                        await self._add_human_delay(300, 500)
-                    except Exception:
-                        pass
-                    # Click search/done
-                    await page.evaluate(
-                        "document.querySelector(\"button[jsname='c6xFrd'], "
-                        "button[aria-label='Buscar']\")?.click()"
-                    )
-                    await self._add_human_delay(2000, 3000)
-
-                except Exception as e:
-                    logger.warning(f"Could not switch to round-trip mode: {e}")
+                logger.info("  Round-trip URL loaded (Google defaults to round-trip)")
 
                 # Step 4: Check if Google updated the URL to tfs= (round-trip)
                 current_url = page.url

@@ -382,7 +382,8 @@ class ResultsPage:
             for i, card in enumerate(cards[:8]):
                 try:
                     aria = await card.get_attribute("aria-label") or ""
-                    flight = self._parse_aria_label(aria)
+                    # In round-trip mode, "ida y vuelta" cards are correct — don't filter
+                    flight = self._parse_aria_label(aria, accept_round_trip=True)
                     if not flight:
                         continue
                     # No href available — caller must click by card index
@@ -464,7 +465,9 @@ class ResultsPage:
             logger.debug(f"Card extraction failed: {e}")
             return None
 
-    def _parse_aria_label(self, aria_label: str) -> dict | None:
+    def _parse_aria_label(
+        self, aria_label: str, accept_round_trip: bool = False
+    ) -> dict | None:
         """Parse flight info from aria-label attribute.
 
         The aria-label contains structured info like:
@@ -493,7 +496,8 @@ class ResultsPage:
             # Google sometimes returns combined round-trip prices even for
             # one-way queries. Those prices are ~2x the real one-way price
             # and must not be compared against the per-leg threshold.
-            if "ida y vuelta" in aria_label.lower():
+            # In round-trip mode (accept_round_trip=True), these cards are correct.
+            if not accept_round_trip and "ida y vuelta" in aria_label.lower():
                 logger.debug("Skipping round-trip card in one-way search")
                 return None
 
