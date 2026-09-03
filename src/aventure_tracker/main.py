@@ -5,7 +5,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from aventure_tracker.config import Settings
@@ -61,12 +61,14 @@ class AdventureOrchestrator:
         weeks_ahead: int = DEFAULT_WEEKS_AHEAD,
         max_posts_per_account: int = 10,
         show_calendar: bool = False,
+        from_date: "date | None" = None,
     ) -> None:
         self._settings = settings or Settings()
         self._mode = mode
         self._weeks_ahead = weeks_ahead
         self._max_posts = max_posts_per_account
         self._show_calendar = show_calendar
+        self._from_date = from_date
 
         self._state_manager: StateManager | None = None
         self._email_notifier: EmailNotifier | None = None
@@ -145,6 +147,7 @@ class AdventureOrchestrator:
                 notifier=None,
                 weeks_ahead=self._weeks_ahead,
                 settings=self._settings,
+                from_date=self._from_date,
             )
             self._logger.info("Flight tracker initialized")
 
@@ -458,6 +461,14 @@ Examples:
         help="Path to configuration directory (default: config)",
     )
     parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Start date for weekend search (default: today). "
+        "Example: --from-date 2026-10-22",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose (debug) logging"
     )
     parser.add_argument(
@@ -480,12 +491,24 @@ async def async_main(args: argparse.Namespace) -> int:
             telegram_chat_id="",
         )
 
+    # Parse optional from_date
+    from_date = None
+    if args.from_date:
+        try:
+            from_date = date.fromisoformat(args.from_date)
+        except ValueError:
+            print(
+                f"Error: --from-date '{args.from_date}' is not a valid date (use YYYY-MM-DD)"
+            )
+            return 1
+
     orchestrator = AdventureOrchestrator(
         settings=settings,
         mode=RunMode(args.mode),
         weeks_ahead=args.weeks,
         max_posts_per_account=args.max_posts,
         show_calendar=args.calendar,
+        from_date=from_date,
     )
     result = await orchestrator.run()
 

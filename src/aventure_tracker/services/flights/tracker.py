@@ -240,6 +240,7 @@ class FlightTrackerService:
         weeks_ahead: int = 8,
         price_store_path: Path | None = None,
         settings: "object | None" = None,
+        from_date: "date | None" = None,
     ) -> None:
         """Initialize the flight tracker service.
 
@@ -252,6 +253,7 @@ class FlightTrackerService:
             weeks_ahead: Number of weeks to check ahead.
             price_store_path: Path to YAML price store (optional).
             settings: Settings instance for env var overrides (optional).
+            from_date: Override start date for weekend calculation (default: today).
         """
         self._routes_config_path = routes_config_path
         self._holidays_config_path = holidays_config_path
@@ -260,6 +262,7 @@ class FlightTrackerService:
         self._scraper = scraper
         self._weeks_ahead = weeks_ahead
         self._settings = settings
+        self._from_date = from_date
 
         self._routes: RoutesConfig | None = None
         self._date_calculator: FlightDateCalculator | None = None
@@ -387,7 +390,9 @@ class FlightTrackerService:
         date_calculator = self._get_date_calculator()
         scraper = self._get_scraper()
 
-        weekends = date_calculator.get_upcoming_weekends(weeks_ahead=self._weeks_ahead)
+        weekends = date_calculator.get_upcoming_weekends(
+            weeks_ahead=self._weeks_ahead, from_date=self._from_date
+        )
 
         result = FlightTrackerResult(
             routes_checked=0,
@@ -721,7 +726,9 @@ class FlightTrackerService:
             List of Friday dates for upcoming weekends.
         """
         date_calculator = self._get_date_calculator()
-        weekends = date_calculator.get_upcoming_weekends(weeks_ahead=self._weeks_ahead)
+        weekends = date_calculator.get_upcoming_weekends(
+            weeks_ahead=self._weeks_ahead, from_date=self._from_date
+        )
         return [w.outbound_date for w in weekends]
 
     def get_bridge_weekends(self) -> list[date]:

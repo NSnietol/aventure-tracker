@@ -294,6 +294,7 @@ class TestAsyncMain:
             config_dir=str(tmp_path),
             verbose=False,
             dry_run=True,
+            from_date=None,
             calendar=False,
         )
         with patch("aventure_tracker.main.AdventureOrchestrator") as mock_cls:
@@ -323,6 +324,7 @@ class TestAsyncMain:
             verbose=False,
             calendar=False,
             dry_run=True,
+            from_date=None,
         )
         with patch("aventure_tracker.main.AdventureOrchestrator") as mock_cls:
             mock_orch = AsyncMock()
