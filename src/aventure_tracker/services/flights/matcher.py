@@ -269,17 +269,14 @@ class EventMatcher:
 
         sorted_dates = sorted(set(dates))
         windows: list[tuple[date, date]] = []
-        seen: set[date] = set()
+        seen_starts: set[date] = set()
 
         for d in sorted_dates:
-            if d in seen:
+            if d in seen_starts:
                 continue
+            seen_starts.add(d)
             window_start = d
             window_end = d + timedelta(days=4)
             windows.append((window_start, window_end))
-            current = window_start
-            while current <= window_end:
-                seen.add(current)
-                current += timedelta(days=1)
 
         return windows

@@ -404,3 +404,36 @@ class TestScrapeIntegration:
                             )
 
                             assert price == 99000
+
+
+class TestParseAriaLabel:
+    """Tests for ResultsPage._parse_aria_label round-trip filtering."""
+
+    def test_one_way_card_extracted(self, mock_page: AsyncMock) -> None:
+        rp = ResultsPage(mock_page)
+        aria = (
+            "Precio total ida desde 278039 pesos colombianos. "
+            "Vuelo sin escalas de LATAM. "
+            "Sale de Barranquilla a las 6:30 p.m. y llega a Medellín a las 7:45 p.m.. "
+            "Duración total: 1 h 15 min."
+        )
+        result = rp._parse_aria_label(aria)
+        assert result is not None
+        assert result["price"] == 278039
+        assert result["airline"] == "LATAM"
+
+    def test_round_trip_card_is_rejected(self, mock_page: AsyncMock) -> None:
+        """Round-trip cards must be skipped in one-way searches."""
+        rp = ResultsPage(mock_page)
+        aria = (
+            "Precio total ida y vuelta desde 343930 pesos colombianos. "
+            "Vuelo sin escalas de LATAM. "
+            "Sale de Barranquilla a las 6:30 p.m. y llega a Medellín a las 7:45 p.m.."
+        )
+        result = rp._parse_aria_label(aria)
+        assert result is None, "Round-trip cards should be filtered out"
+
+    def test_round_trip_uppercase_rejected(self, mock_page: AsyncMock) -> None:
+        rp = ResultsPage(mock_page)
+        aria = "Precio total IDA Y VUELTA desde 200000 pesos colombianos."
+        assert rp._parse_aria_label(aria) is None

@@ -22,10 +22,11 @@ Adventure Tracker es un sistema personal de monitoreo que:
 ### 2.1 Rutas monitoreadas
 
 - Las rutas se definen en `config/routes.yaml`.
-- Cada ruta tiene: `origin`, `destination` (códigos IATA), `price_threshold` (COP), `drop_percentage` y `search_days`.
-- Rutas activas: **BAQ→MDE** (ida, jueves/viernes) y **MDE→BAQ** (vuelta, domingo/lunes).
+- Cada ruta tiene: `origin`, `destination` (códigos IATA), `price_threshold`, `round_trip_threshold`, `drop_percentage`, `search_days`, `return_days` y `search_mode`.
+- Rutas activas: **BAQ→MDE** (ida, jueves/viernes) y **MDE→BAQ** (vuelta, lunes — definida como par RT).
+- Ambas rutas usan `search_mode: round_trip` — Google Flights se consulta con precio combinado.
 - La ruta CTG-MDE/MDE-CTG está desactivada porque el tiempo de traslado desde Barranquilla no lo justifica.
-- Los precios son **solo ida** (one-way) por tramo.
+- Los precios son el **total round-trip combinado** (ida+vuelta en una sola búsqueda). No se rastrean tramos one-way independientes.
 
 ### 2.2 Días de búsqueda y ventanas horarias
 
@@ -39,12 +40,12 @@ El día y ventana válidos dependen de **cuándo empieza la aventura en MDE**:
 |-----------------------|-----------------------------|------------------------|-------------------------------------------------------------|
 | Jueves tarde          | Jueves                      | 18:00 – 23:59          | Llegar esa misma noche antes de que empiece el plan         |
 | Viernes (cualquier hora) | Jueves o viernes         | Jue 18:00–23:59 / Vie 00:00–16:00 | Llegar el jueves noche o el viernes en la mañana/tarde |
-| Sábado                | Viernes (**obligatorio**)   | 00:00 – 16:00          | Las aventuras empiezan a las 6AM en MDE; salir de BAQ a las 3AM no es viable |
+| Sábado                | Viernes (**obligatorio**)   | 00:00 – **19:30**      | Aventura empieza sábado — se puede volar el viernes hasta las 7:30 PM |
 
 - Si la aventura **empieza el viernes por la noche**: vuelo del viernes con llegada antes de las 4PM es **obligatorio**.
-- Si la aventura **empieza el sábado**: vuelo del viernes ≤ 4PM es **obligatorio**. Las aventuras arrancan a las 6AM en MDE — salir de BAQ a las 3AM para conectar no es viable.
+- Si la aventura **empieza el sábado**: vuelo del viernes hasta las **7:30 PM** es válido (tiempo suficiente para llegar a MDE esa noche y estar listo el sábado temprano).
 - Si la aventura **empieza el jueves tarde**: hay que buscar vuelo el jueves.
-- El cutoff de las **16:00 del viernes** aplica en todos los casos donde la aventura empieza el viernes o el sábado.
+- El `TIME_FILTER` del viernes usa la ventana amplia (19:30). El filtro fino para eventos del viernes se aplica en `_build_weekend_pairs()` cuando se conocen los eventos.
 
 #### Vuelos de vuelta (MDE → BAQ)
 
@@ -66,7 +67,7 @@ El día válido depende de **cuándo termina la aventura en MDE** y del tramo ex
 | Día de vuelo  | Ventana válida     | Cuándo aplica                                                                |
 |---------------|--------------------|---------------------------------------------------------------------------  |
 | Jueves        | 18:00 – 23:59      | Aventura empieza el jueves tarde o el viernes                                |
-| Viernes       | 00:00 – 16:00      | Aventura empieza el viernes **o el sábado** (obligatorio en ambos casos)     |
+| Viernes       | 00:00 – **19:30**  | Evento viernes → llegar antes 16:00 / Evento sábado → hasta 19:30           |
 | Domingo       | ≥ 11:00            | Solo si aventura es exclusivamente de sábado (`sunday_adventure = False`)    |
 | Lunes         | 00:00 – 10:00      | Aventura termina el domingo en MDE (~8PM, no es posible volar ese día)       |
 | Martes        | 00:00 – 10:00      | Aventura termina el lunes en MDE                                             |
@@ -94,11 +95,13 @@ La decisión de rastrear un vuelo sigue este orden (primera regla que aplica gan
 ### 2.4 Umbral de precio y alerta
 
 - Un vuelo genera alerta si:
-  - `precio ≤ price_threshold` de la ruta (`is_below_threshold = True`), **O**
+  - `precio_total_RT ≤ round_trip_threshold` de la ruta (`is_below_threshold = True`), **O**
   - la caída de precio desde el registro anterior es `≥ drop_percentage` de la ruta (`is_significant_drop = True`).
-- El umbral actual es **300,000 COP** por tramo para BAQ↔MDE.
+- El umbral actual es **300,000 COP total RT** (ida+vuelta combinados) para BAQ↔MDE.
 - La caída mínima para alerta es **15 %** para ambas rutas.
 - Las alertas individuales **no se envían** en tiempo real. Se acumulan y el orquestador envía un reporte consolidado al final.
+
+**Nota sobre precios de opciones de regreso**: Google Flights solo muestra el precio total RT en la pantalla de regreso. El sistema usa ese mismo total como precio de cada opción de regreso para permitir comparaciones relativas. El precio que aparece en el email es siempre el total RT del outbound que se está mostrando.
 
 ### 2.5 Horizonte temporal
 
@@ -120,11 +123,12 @@ La decisión de rastrear un vuelo sigue este orden (primera regla que aplica gan
 
 Cuando se encuentran vuelos baratos, el orquestador construye un `WeekendPair` por cada vuelo de ida barato:
 
-- **Ventana de fin de semana**: `window_start` (día del vuelo de ida) + 4 días → `window_end`.
-- **Vuelo de ida** (`outbound`): el vuelo barato que disparó la alerta.
-- **Opciones de vuelta** (`return_options`): hasta 3 opciones, ordenadas por precio.
-- **Eventos** (`events`): planes de agencias disponibles en esa ventana.
+- **Ventana de fin de semana**: `window_start` (día del vuelo de ida) → `window_end` (fecha real del vuelo de regreso recomendado). Si no hay regreso, `window_end = window_start + 5`.
+- **Vuelo de ida** (`outbound`): el vuelo RT barato que disparó la alerta. Precio = total RT.
+- **Opciones de vuelta** (`return_options`): hasta 3 opciones, ordenadas por precio total RT.
+- **Eventos** (`events`): planes de agencias disponibles en esa ventana (incluyendo `data/manual_events.yaml`).
 - **`sunday_adventure`**: flag que indica si hay eventos el domingo (fuerza regreso el lunes).
+- **Orden en email**: los vuelos de ida se ordenan con LATAM al final de cada grupo de fecha ("caviar ordering") — las opciones económicas aparecen primero.
 
 ### 3.2 Regla del domingo
 
@@ -385,7 +389,23 @@ Un evento matchea una ventana si:
 
 ---
 
-## 12. Reglas de configuración que NO se deben romper
+## 13. Eventos manuales
+
+Para eventos que no vienen de imágenes de agencias (reuniones de amigos, planes personales, etc.), se pueden agregar directamente en `data/manual_events.yaml`:
+
+```yaml
+events:
+  - name: "Nombre del evento"
+    agency: "personal"
+    date_start: "2026-10-24"
+    date_end:   "2026-10-25"
+    price: 0
+    notes: "Descripción opcional"
+```
+
+- Los eventos manuales aparecen en el email con el tag `📌 manual`.
+- Se procesan igual que los eventos extraídos de imágenes para el matching de vuelos.
+- El campo `sold_out: true` los excluye del reporte si aplica.
 
 1. **Nunca agregar CTG como ruta activa** sin evaluar primero que el traslado BAQ→CTG lo justifique económicamente.
 2. **No incluir destinos de playa** en notificaciones (categoría `playa` en blacklist).

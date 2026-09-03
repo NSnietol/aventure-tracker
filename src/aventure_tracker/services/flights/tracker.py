@@ -20,18 +20,13 @@ from aventure_tracker.services.shared.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 
-# Time filters by day of week
-# IMPORTANT: These filters run BEFORE _build_weekend_pairs().
-# - SUNDAY is intentionally absent: whether a Sunday return is valid
-#   depends on the adventure context (saturday-only vs multi-day).
-#   That decision is made in _build_weekend_pairs(), not here.
-# - SATURDAY is absent: not a valid search day per business rules.
-# - TUESDAY uses a wide early-morning window to cover the case where
-#   the adventure ends Monday in MDE and the user flies home Tuesday.
+# Time filters by day of week — DEPRECATED in favor of time_windows in routes.yaml.
+# Kept as fallback if routes.yaml doesn't define time_windows.
 TIME_FILTERS: dict[SearchDay, tuple[time, time]] = {
     SearchDay.THURSDAY: (time(18, 0), time(23, 59)),
     SearchDay.FRIDAY: (time(0, 0), time(16, 0)),
     SearchDay.MONDAY: (time(0, 0), time(10, 0)),
+    SearchDay.TUESDAY: (time(0, 0), time(10, 0)),
 }
 
 
@@ -240,6 +235,7 @@ class FlightTrackerService:
         weeks_ahead: int = 8,
         price_store_path: Path | None = None,
         settings: "object | None" = None,
+        from_date: "date | None" = None,
     ) -> None:
         """Initialize the flight tracker service.
 
@@ -252,6 +248,7 @@ class FlightTrackerService:
             weeks_ahead: Number of weeks to check ahead.
             price_store_path: Path to YAML price store (optional).
             settings: Settings instance for env var overrides (optional).
+            from_date: Override start date for weekend calculation (default: today).
         """
         self._routes_config_path = routes_config_path
         self._holidays_config_path = holidays_config_path
@@ -260,6 +257,7 @@ class FlightTrackerService:
         self._scraper = scraper
         self._weeks_ahead = weeks_ahead
         self._settings = settings
+        self._from_date = from_date
 
         self._routes: RoutesConfig | None = None
         self._date_calculator: FlightDateCalculator | None = None
@@ -302,31 +300,51 @@ class FlightTrackerService:
 
     def _is_valid_time_for_day(
         self, departure_time: str, search_day: SearchDay
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """Check if departure time is valid for the search day.
+
+        Uses time_windows from routes.yaml when available, falls back to
+        the hardcoded TIME_FILTERS.
 
         Args:
             departure_time: Time in HH:MM format.
             search_day: The day being searched.
 
         Returns:
-            True if time is within valid window for that day.
+            Tuple of (is_valid, reason). reason describes the exact rule
+            that was applied (used in skip log messages).
         """
         if not departure_time:
-            return True  # Accept if time not extracted
+            return True, "no time — accepted by default"
 
         try:
             hour, minute = map(int, departure_time.split(":"))
             flight_time = time(hour, minute)
         except (ValueError, AttributeError):
-            return True  # Accept if parsing fails
+            return True, "time unparseable — accepted by default"
 
+        # Prefer time_windows from loaded routes config
+        routes = self._load_routes()
+        day_key = search_day.value  # e.g. "friday"
+        window_cfg = routes.time_windows.get(day_key)
+
+        if window_cfg is not None:
+            valid = window_cfg.contains(departure_time)
+            rule = (
+                f"time_windows.{day_key}: {window_cfg.from_time}–{window_cfg.to_time}"
+                f" ({window_cfg.note})"
+            )
+            return valid, rule
+
+        # Fallback to hardcoded TIME_FILTERS
         time_range = TIME_FILTERS.get(search_day)
         if not time_range:
-            return True  # No filter for this day
+            return True, f"no window defined for {search_day.value} — accepted"
 
         min_time, max_time = time_range
-        return min_time <= flight_time <= max_time
+        valid = min_time <= flight_time <= max_time
+        rule = f"TIME_FILTERS[{search_day.value}]: {min_time.strftime('%H:%M')}–{max_time.strftime('%H:%M')}"
+        return valid, rule
 
     def _should_track_flight(self, flight: FlightResult, route: RouteConfig) -> bool:
         """Determine if a flight should be tracked using AirlinePolicy.
@@ -387,7 +405,9 @@ class FlightTrackerService:
         date_calculator = self._get_date_calculator()
         scraper = self._get_scraper()
 
-        weekends = date_calculator.get_upcoming_weekends(weeks_ahead=self._weeks_ahead)
+        weekends = date_calculator.get_upcoming_weekends(
+            weeks_ahead=self._weeks_ahead, from_date=self._from_date
+        )
 
         result = FlightTrackerResult(
             routes_checked=0,
@@ -478,12 +498,13 @@ class FlightTrackerService:
 
                     for flight in flights:
                         departure_time_str = flight.departure_time.strftime("%H:%M")
-                        if not self._is_valid_time_for_day(
+                        valid_time, time_rule = self._is_valid_time_for_day(
                             departure_time_str, search_day
-                        ):
+                        )
+                        if not valid_time:
                             logger.debug(
                                 f"    Skipping {flight.airline} {departure_time_str}: "
-                                f"outside time window for {search_day.value}"
+                                f"outside time window — rule: {time_rule}"
                             )
                             continue
 
@@ -540,7 +561,9 @@ class FlightTrackerService:
         result: "FlightTrackerResult",
     ) -> None:
         """Track a paired outbound+return route using round-trip search."""
-        logger.info(f"Checking round-trip: {outbound_route} ↔ {return_route.origin}")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"  ROUND-TRIP: {outbound_route} ↔ {return_route.origin}")
+        logger.info(f"{'=' * 60}")
         result.routes_checked += 2  # counts both legs
 
         for weekend in weekends:
@@ -581,10 +604,13 @@ class FlightTrackerService:
                             returns = pair.get("return_options", [])
 
                             out_time = out.get("departure_time", "")
-                            if not self._is_valid_time_for_day(out_time, outbound_day):
+                            valid_time, time_rule = self._is_valid_time_for_day(
+                                out_time, outbound_day
+                            )
+                            if not valid_time:
                                 logger.debug(
                                     f"    Skipping outbound {out.get('airline')} "
-                                    f"{out_time}: outside time window"
+                                    f"{out_time}: outside time window — rule: {time_rule}"
                                 )
                                 continue
 
@@ -619,6 +645,65 @@ class FlightTrackerService:
                             if alert.should_notify:
                                 result.alerts_generated += 1
                                 result.price_alerts.append(alert)
+
+                            # Convert return_options to FlightFound and add to results.
+                            # return_date is already known from the search parameters.
+                            #
+                            # PRICE NOTE: Google only shows a combined RT total — it
+                            # does not break down the price per leg on the return screen.
+                            # We use the outbound total as the return price too so that
+                            # build_weekend_pairs can compare options by total cost.
+                            # Duplicates (same flight from multiple outbound searches)
+                            # are deduplicated by flight_id; the cheapest total wins.
+                            seen_ret_ids: set[str] = set()
+                            for ret in returns:
+                                ret_time = ret.get("departure_time", "")
+                                ret_airline = ret.get("airline", "Unknown")
+                                if not ret_time:
+                                    continue
+
+                                # Validate return time window
+                                valid_ret_time, ret_time_rule = (
+                                    self._is_valid_time_for_day(ret_time, return_day)
+                                )
+                                if not valid_ret_time:
+                                    logger.debug(
+                                        f"    Skipping return {ret_airline} {ret_time}: "
+                                        f"outside time window — rule: {ret_time_rule}"
+                                    )
+                                    continue
+
+                                ret_flight_id = (
+                                    f"RT_{return_route.origin}-{return_route.destination}"
+                                    f"_{return_date}_{ret_time}_{ret_airline}"
+                                )
+                                ret_is_priority = self._is_priority_airline(ret_airline)
+                                ret_found = FlightFound(
+                                    flight_id=ret_flight_id,
+                                    route=f"{return_route.origin}→{return_route.destination}",
+                                    travel_date=return_date,
+                                    departure_time=ret_time,
+                                    airline=ret_airline,
+                                    # Use the combined RT total as the return price.
+                                    # This makes build_weekend_pairs sort/compare returns
+                                    # by the real total cost of choosing that return flight.
+                                    price=total,
+                                    is_priority=ret_is_priority,
+                                )
+                                logger.debug(
+                                    f"    Return option: {return_date} {ret_time} "
+                                    f"{ret_airline} (RT total ${total:,})"
+                                )
+                                # Deduplicate within this pair's return list
+                                if ret_flight_id in seen_ret_ids:
+                                    continue
+                                seen_ret_ids.add(ret_flight_id)
+
+                                result.prices_found.append(ret_found)
+
+                                ret_alert = self._create_alert(ret_found, return_route)
+                                if ret_alert.should_notify:
+                                    result.price_alerts.append(ret_alert)
 
                     except Exception as e:
                         error_type = type(e).__name__
@@ -662,7 +747,15 @@ class FlightTrackerService:
             if previous_price > 0:
                 price_change_pct = round((price_change / previous_price) * 100, 1)
 
-        is_below_threshold = flight.price <= route_config.price_threshold
+        from aventure_tracker.models.flight import SearchMode
+
+        # In round-trip mode, compare total price against round_trip_threshold
+        threshold = (
+            route_config.effective_round_trip_threshold
+            if route_config.search_mode == SearchMode.ROUND_TRIP
+            else route_config.price_threshold
+        )
+        is_below_threshold = flight.price <= threshold
         is_significant_drop = (
             price_change_pct is not None
             and price_change_pct < 0
@@ -719,7 +812,9 @@ class FlightTrackerService:
             List of Friday dates for upcoming weekends.
         """
         date_calculator = self._get_date_calculator()
-        weekends = date_calculator.get_upcoming_weekends(weeks_ahead=self._weeks_ahead)
+        weekends = date_calculator.get_upcoming_weekends(
+            weeks_ahead=self._weeks_ahead, from_date=self._from_date
+        )
         return [w.outbound_date for w in weekends]
 
     def get_bridge_weekends(self) -> list[date]:

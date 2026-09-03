@@ -329,8 +329,12 @@ class ResultsPage:
 
         return sorted(prices)
 
-    async def get_flight_details(self) -> list[dict]:
+    async def get_flight_details(self, accept_round_trip: bool = False) -> list[dict]:
         """Extract detailed flight information.
+
+        Args:
+            accept_round_trip: When True, accept cards showing combined round-trip
+                prices (used on the return screen of a round-trip search).
 
         Returns:
             List of flight detail dictionaries.
@@ -344,7 +348,9 @@ class ResultsPage:
 
             for card in cards[:10]:  # Limit to first 10 results
                 try:
-                    flight = await self._extract_flight_from_card(card)
+                    flight = await self._extract_flight_from_card(
+                        card, accept_round_trip=accept_round_trip
+                    )
                     if flight:
                         flights.append(flight)
                 except Exception as e:
@@ -382,7 +388,8 @@ class ResultsPage:
             for i, card in enumerate(cards[:8]):
                 try:
                     aria = await card.get_attribute("aria-label") or ""
-                    flight = self._parse_aria_label(aria)
+                    # In round-trip mode, "ida y vuelta" cards are correct — don't filter
+                    flight = self._parse_aria_label(aria, accept_round_trip=True)
                     if not flight:
                         continue
                     # No href available — caller must click by card index
@@ -400,11 +407,14 @@ class ResultsPage:
 
         return flights
 
-    async def _extract_flight_from_card(self, card) -> dict | None:
+    async def _extract_flight_from_card(
+        self, card, accept_round_trip: bool = False
+    ) -> dict | None:
         """Extract flight info from a result card.
 
         Args:
             card: The card element.
+            accept_round_trip: When True, accept cards with round-trip prices.
 
         Returns:
             Flight info dictionary or None.
@@ -415,7 +425,9 @@ class ResultsPage:
             if link_elem:
                 aria_label = await link_elem.get_attribute("aria-label")
                 if aria_label:
-                    result = self._parse_aria_label(aria_label)
+                    result = self._parse_aria_label(
+                        aria_label, accept_round_trip=accept_round_trip
+                    )
                     if result and result.get("price"):
                         return result
 
@@ -464,7 +476,9 @@ class ResultsPage:
             logger.debug(f"Card extraction failed: {e}")
             return None
 
-    def _parse_aria_label(self, aria_label: str) -> dict | None:
+    def _parse_aria_label(
+        self, aria_label: str, accept_round_trip: bool = False
+    ) -> dict | None:
         """Parse flight info from aria-label attribute.
 
         The aria-label contains structured info like:
@@ -489,8 +503,18 @@ class ResultsPage:
                 "stops": 0,
             }
 
-            # Extract price: "desde NNNNNN pesos colombianos"
-            price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label)
+            # Skip round-trip cards in one-way searches.
+            # Google sometimes returns combined round-trip prices even for
+            # one-way queries. Those prices are ~2x the real one-way price
+            # and must not be compared against the per-leg threshold.
+            # In round-trip mode (accept_round_trip=True), these cards are correct.
+            if not accept_round_trip and "ida y vuelta" in aria_label.lower():
+                logger.debug("Skipping round-trip card in one-way search")
+                return None
+
+            # Extract price: "Desde NNNNNN pesos" (one-way) or
+            # "desde NNNNNN pesos" (round-trip — already filtered above)
+            price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label, re.IGNORECASE)
             if price_match:
                 result["price"] = int(price_match.group(1))
 

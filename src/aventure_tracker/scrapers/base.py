@@ -11,14 +11,21 @@ from typing import AsyncGenerator
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 # Try to import playwright_stealth, but make it optional
-# Some Python versions have issues with pkg_resources dependency
+# Try to import playwright_stealth (API changed in v2 — use Stealth class)
 try:
-    from playwright_stealth import stealth_async
+    from playwright_stealth import Stealth
 
     STEALTH_AVAILABLE = True
+    stealth_async = None  # not used with v2
 except ImportError:
-    STEALTH_AVAILABLE = False
-    stealth_async = None  # type: ignore
+    try:
+        from playwright_stealth import stealth_async  # v1 API fallback
+
+        STEALTH_AVAILABLE = True
+    except ImportError:
+        STEALTH_AVAILABLE = False
+        stealth_async = None  # type: ignore
+        Stealth = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -190,9 +197,17 @@ class BaseScraper(ABC):
         self._page = await self._context.new_page()
 
         # Apply stealth mode if available
-        if STEALTH_AVAILABLE and stealth_async is not None:
-            await stealth_async(self._page)
-            logger.debug("Stealth mode applied")
+        if STEALTH_AVAILABLE:
+            try:
+                if Stealth is not None:
+                    # playwright-stealth v2 API
+                    await Stealth().apply_stealth_async(self._page)
+                elif stealth_async is not None:
+                    # v1 API fallback
+                    await stealth_async(self._page)
+                logger.debug("Stealth mode applied")
+            except Exception as e:
+                logger.debug(f"Stealth mode not applied: {e}")
         else:
             global _stealth_warning_shown
             if not _stealth_warning_shown:

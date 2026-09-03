@@ -161,6 +161,37 @@ class SearchMode(str, Enum):
     ROUND_TRIP = "round_trip"
 
 
+class TimeWindowConfig(BaseModel):
+    """Valid departure time range for a specific search day.
+
+    Attributes:
+        from_time: Earliest valid departure (HH:MM).
+        to_time: Latest valid departure (HH:MM, inclusive).
+        note: Optional description of the rule.
+    """
+
+    from_time: str = Field(alias="from", default="00:00")
+    to_time: str = Field(alias="to", default="23:59")
+    note: str = ""
+
+    model_config = {"populate_by_name": True}
+
+    def contains(self, departure_time: str) -> bool:
+        """Return True if departure_time (HH:MM) is within this window."""
+        try:
+            from datetime import time as _time
+
+            def _parse(t: str) -> "_time":
+                h, m = map(int, t.split(":"))
+                return _time(h, m)
+
+            return (
+                _parse(self.from_time) <= _parse(departure_time) <= _parse(self.to_time)
+            )
+        except (ValueError, AttributeError):
+            return True  # accept if parsing fails
+
+
 class RouteConfig(BaseModel):
     """Configuration for a flight route to monitor.
 
@@ -238,6 +269,14 @@ class RoutesConfig(BaseModel):
 
     routes: list[RouteConfig] = Field(default_factory=list)
     airline_policy: AirlinePolicy = Field(default_factory=AirlinePolicy.default)
+    time_windows: dict[str, TimeWindowConfig] = Field(
+        default_factory=lambda: {
+            "thursday": TimeWindowConfig(**{"from": "18:00", "to": "23:59"}),
+            "friday": TimeWindowConfig(**{"from": "00:00", "to": "22:00"}),
+            "monday": TimeWindowConfig(**{"from": "00:00", "to": "10:00"}),
+        },
+        description="Valid departure time ranges per search day, loaded from routes.yaml.",
+    )
 
     @classmethod
     def from_yaml(

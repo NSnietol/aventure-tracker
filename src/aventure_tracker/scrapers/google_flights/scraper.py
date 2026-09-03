@@ -10,7 +10,6 @@ from aventure_tracker.scrapers.google_flights.locators import BASE_URL
 from aventure_tracker.scrapers.google_flights.page_objects import (
     ConsentHandler,
     ResultsPage,
-    SearchForm,
 )
 
 logger = logging.getLogger(__name__)
@@ -241,38 +240,29 @@ class GoogleFlightsScraper(BaseScraper):
         async with self.browser_session() as page:
             try:
                 consent = ConsentHandler(page)
-                form = SearchForm(page)
                 logger.info(
-                    f"Round-trip search: {outbound_route} on {outbound_date} "
-                    f"↔ {return_date}"
+                    f"━━━ RT {outbound_route} on {outbound_date} ↔ {return_date} ━━━"
                 )
 
-                # Navigate to base URL and use the search form.
-                # The q= URL format doesn't support round-trip dates reliably —
-                # Google ignores the 'vuelta YYYY-MM-DD' part and shows the home page.
-                base_url = f"{BASE_URL}?curr={self._currency}&hl={self._language}"
-                await self.navigate(base_url, wait_until="networkidle")
-                await consent.dismiss_consent_if_present()
-                await self._add_human_delay(500, 1000)
+                # Step 1: Navigate without 'solo ida' — Google defaults to round-trip mode
+                # and shows combined outbound+return prices (which is what we want).
+                from urllib.parse import quote as _quote
 
-                # Fill the form: origin, destination, dates
-                await form.set_origin(outbound_route.origin)
-                await self._add_human_delay(800, 1200)
-                await form.set_destination(outbound_route.destination)
-                await self._add_human_delay(800, 1200)
-                await form.set_departure_date(outbound_date)
-                await self._add_human_delay(500, 800)
-                await form.set_return_date(return_date)
-                await self._add_human_delay(500, 800)
-                await form.submit_search()
-                await self._add_human_delay(2000, 3000)
+                date_str = outbound_date.strftime("%Y-%m-%d")
+                query = f"Vuelos de {outbound_route.origin} a {outbound_route.destination} el {date_str}"
+                rt_url = f"{BASE_URL}?q={_quote(query)}&curr={self._currency}&hl={self._language}"
+                await self.navigate(rt_url, wait_until="networkidle")
+                await consent.dismiss_consent_if_present()
+                await self._add_human_delay(1000, 1500)
+                logger.info("  Round-trip URL loaded (Google defaults to round-trip)")
+
+                # Step 4: Check if Google updated the URL to tfs= (round-trip)
+                current_url = page.url
+                logger.info(
+                    f"  URL after RT switch: {'tfs=' in current_url and 'search' in current_url}"
+                )
 
                 results_page = ResultsPage(page)
-                if not await results_page.wait_for_results():
-                    logger.warning("No round-trip results found")
-                    return results
-
-                # Step 1: Get outbound card data from aria-labels
                 outbound_cards = await results_page.get_flight_details_with_hrefs()
                 logger.info(f"Found {len(outbound_cards)} outbound options")
 
@@ -295,7 +285,10 @@ class GoogleFlightsScraper(BaseScraper):
                             logger.debug(f"  Card index {card_index} out of range")
                             continue
 
-                        await cards_now[card_index].click()
+                        # Use JS click to bypass overlay elements that intercept pointer events
+                        await page.evaluate(
+                            f'document.querySelectorAll(\'[role="link"][aria-label*="pesos colombianos"]\')[{card_index}]?.click()'
+                        )
                         await self._add_human_delay(1500, 2500)
 
                         return_page = ResultsPage(page)
@@ -309,7 +302,9 @@ class GoogleFlightsScraper(BaseScraper):
                             await results_page.wait_for_results(timeout_ms=8000)
                             continue
 
-                        return_flights = await return_page.get_flight_details()
+                        return_flights = await return_page.get_flight_details(
+                            accept_round_trip=True
+                        )
                         logger.info(f"  Found {len(return_flights)} return options")
 
                         results.append(

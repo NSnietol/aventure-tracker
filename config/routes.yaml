@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=
 # =============================================================================
 # Flight Routes Configuration
 # =============================================================================
@@ -9,6 +10,37 @@
 #   - Pair BAQ→MDE with MDE→BAQ (matched by origin/destination)
 #   - round_trip_threshold: max combined price (defaults to 2 × price_threshold)
 #   - return_days: valid days for the return leg
+
+# =============================================================================
+# Time Windows
+# =============================================================================
+# Valid departure time ranges per search day.
+# Flights outside these windows are discarded before price evaluation.
+#
+# NOTE: Sunday is intentionally absent — the decision to allow Sunday returns
+# depends on whether events fall on Sunday (sunday_adventure flag), and is
+# handled exclusively in weekend_pairs.py, not here.
+time_windows:
+  thursday:
+    from: "18:00"
+    to: "23:59"
+    note: "Aventura empieza el jueves tarde o el viernes — llegar esa noche"
+  friday:
+    from: "00:00"
+    to: "19:30"
+    note: >
+      Dos sub-casos: si evento es el viernes -> llegar antes 4PM (16:00).
+      Si evento es el sabado -> puede volar hasta las 7:30PM del viernes.
+      Se usa la ventana amplia (19:30); el filtro fino por evento-viernes
+      se aplica en weekend_pairs.py cuando se conocen los eventos.
+  monday:
+    from: "00:00"
+    to: "10:00"
+    note: "Aventura termina el domingo en MDE (~8PM) — imposible volar ese dia"
+  tuesday:
+    from: "00:00"
+    to: "10:00"
+    note: "Aventura termina el lunes en MDE — volar martes temprano"
 
 # =============================================================================
 # Airline Policy
@@ -27,15 +59,15 @@ airline_policy:
       max_price: 150000
 
 routes:
-  # === ONE-WAY: BAQ → MDE (outbound Thu/Fri) ===
-  # search_mode: one_way — each leg searched independently.
-  # Switch to round_trip when scrape_round_trip() is stable.
+  # === ROUND-TRIP: BAQ ↔ MDE ===
+  # Outbound Thu/Fri, return Sun/Mon.
+  # Total price compared against round_trip_threshold (300k = ~150k per leg).
   - origin: BAQ
     destination: MDE
     price_threshold: 150000
     round_trip_threshold: 300000
     drop_percentage: 15
-    search_mode: one_way
+    search_mode: round_trip
     search_days: [thursday, friday]
     return_days: [sunday, monday]
 
@@ -44,26 +76,22 @@ routes:
     price_threshold: 150000
     round_trip_threshold: 300000
     drop_percentage: 15
-    search_mode: one_way
+    search_mode: round_trip
     search_days: [sunday, monday]
     return_days: [thursday, friday]
 
-  # === ROUND-TRIP (disabled — scrape_round_trip form interaction needs work) ===
-  # Uncomment when form-based search or tfs= URL generation is stable.
+  # === ONE-WAY FALLBACK (disabled) ===
+  # Uncomment to compare or debug individual legs.
   # - origin: BAQ
   #   destination: MDE
   #   price_threshold: 150000
-  #   round_trip_threshold: 300000
   #   drop_percentage: 15
-  #   search_mode: round_trip
+  #   search_mode: one_way
   #   search_days: [thursday, friday]
-  #   return_days: [sunday, monday]
   #
   # - origin: MDE
   #   destination: BAQ
   #   price_threshold: 150000
-  #   round_trip_threshold: 300000
   #   drop_percentage: 15
-  #   search_mode: round_trip
+  #   search_mode: one_way
   #   search_days: [sunday, monday]
-  #   return_days: [thursday, friday]

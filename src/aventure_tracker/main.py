@@ -5,7 +5,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from aventure_tracker.config import Settings
@@ -61,12 +61,14 @@ class AdventureOrchestrator:
         weeks_ahead: int = DEFAULT_WEEKS_AHEAD,
         max_posts_per_account: int = 10,
         show_calendar: bool = False,
+        from_date: "date | None" = None,
     ) -> None:
         self._settings = settings or Settings()
         self._mode = mode
         self._weeks_ahead = weeks_ahead
         self._max_posts = max_posts_per_account
         self._show_calendar = show_calendar
+        self._from_date = from_date
 
         self._state_manager: StateManager | None = None
         self._email_notifier: EmailNotifier | None = None
@@ -145,6 +147,7 @@ class AdventureOrchestrator:
                 notifier=None,
                 weeks_ahead=self._weeks_ahead,
                 settings=self._settings,
+                from_date=self._from_date,
             )
             self._logger.info("Flight tracker initialized")
 
@@ -285,6 +288,31 @@ class AdventureOrchestrator:
 
         outbound_all.sort(key=lambda x: (x.travel_date, x.departure_time))
         return_all.sort(key=lambda x: (x.travel_date, x.departure_time))
+
+        # Deduplicate by flight_id — same outbound appears twice when searched
+        # with Sunday AND Monday return dates (two separate RT searches).
+        seen_ids: set[str] = set()
+        outbound_all = [
+            f
+            for f in outbound_all
+            if not (f.flight_id in seen_ids or seen_ids.add(f.flight_id))
+        ]  # type: ignore[func-returns-value]
+        seen_ids.clear()
+        return_all = [
+            f
+            for f in return_all
+            if not (f.flight_id in seen_ids or seen_ids.add(f.flight_id))
+        ]  # type: ignore[func-returns-value]
+
+        # LATAM "caviar" ordering: sort LATAM last within each date group so
+        # cheaper airlines appear first and LATAM shows as premium option at end.
+        outbound_all.sort(
+            key=lambda f: (
+                f.travel_date,
+                1 if "LATAM" in f.airline.upper() else 0,
+                f.departure_time,
+            )
+        )
 
         all_dates = [f.travel_date for f in outbound_all + return_all]
         matcher = EventMatcher(destinations_path=self._settings.get_destinations_path())
@@ -458,6 +486,14 @@ Examples:
         help="Path to configuration directory (default: config)",
     )
     parser.add_argument(
+        "--from-date",
+        type=str,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Start date for weekend search (default: today). "
+        "Example: --from-date 2026-10-22",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose (debug) logging"
     )
     parser.add_argument(
@@ -480,12 +516,24 @@ async def async_main(args: argparse.Namespace) -> int:
             telegram_chat_id="",
         )
 
+    # Parse optional from_date
+    from_date = None
+    if args.from_date:
+        try:
+            from_date = date.fromisoformat(args.from_date)
+        except ValueError:
+            print(
+                f"Error: --from-date '{args.from_date}' is not a valid date (use YYYY-MM-DD)"
+            )
+            return 1
+
     orchestrator = AdventureOrchestrator(
         settings=settings,
         mode=RunMode(args.mode),
         weeks_ahead=args.weeks,
         max_posts_per_account=args.max_posts,
         show_calendar=args.calendar,
+        from_date=from_date,
     )
     result = await orchestrator.run()
 
@@ -541,7 +589,26 @@ def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
     try:
-        return asyncio.run(async_main(args))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(async_main(args))
+        finally:
+            try:
+                # Cancel pending tasks so subprocess transports are closed
+                # before the loop closes — prevents RuntimeError: Event loop is closed
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.run_until_complete(loop.shutdown_default_executor())
+            finally:
+                asyncio.set_event_loop(None)
+                loop.close()
     except KeyboardInterrupt:
         print("\nInterrupted by user")
         return 130
