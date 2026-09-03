@@ -646,6 +646,53 @@ class FlightTrackerService:
                                 result.alerts_generated += 1
                                 result.price_alerts.append(alert)
 
+                            # Convert return_options to FlightFound and add to results.
+                            # return_date is already known from the search parameters —
+                            # we don't need to parse it from the aria-label.
+                            for ret in returns:
+                                ret_time = ret.get("departure_time", "")
+                                ret_airline = ret.get("airline", "Unknown")
+                                ret_price = ret.get("price")
+                                if not ret_time or not ret_price:
+                                    continue
+
+                                # Validate return time window
+                                valid_ret_time, ret_time_rule = self._is_valid_time_for_day(
+                                    ret_time, return_day
+                                )
+                                if not valid_ret_time:
+                                    logger.debug(
+                                        f"    Skipping return {ret_airline} {ret_time}: "
+                                        f"outside time window — rule: {ret_time_rule}"
+                                    )
+                                    continue
+
+                                ret_is_priority = self._is_priority_airline(ret_airline)
+                                ret_found = FlightFound(
+                                    flight_id=(
+                                        f"RT_{return_route.origin}-{return_route.destination}"
+                                        f"_{return_date}_{ret_time}_{ret_airline}"
+                                    ),
+                                    route=f"{return_route.origin}→{return_route.destination}",
+                                    travel_date=return_date,
+                                    departure_time=ret_time,
+                                    airline=ret_airline,
+                                    # Store per-leg estimate: total minus outbound price.
+                                    # Google shows total RT price on the return screen too,
+                                    # so we store it as-is for relative comparisons.
+                                    price=ret_price,
+                                    is_priority=ret_is_priority,
+                                )
+                                logger.debug(
+                                    f"    Return option: {return_date} {ret_time} "
+                                    f"{ret_airline} ${ret_price:,}"
+                                )
+                                result.prices_found.append(ret_found)
+
+                                ret_alert = self._create_alert(ret_found, return_route)
+                                if ret_alert.should_notify:
+                                    result.price_alerts.append(ret_alert)
+
                     except Exception as e:
                         error_type = type(e).__name__
                         error_msg = (

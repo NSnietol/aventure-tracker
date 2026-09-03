@@ -304,6 +304,16 @@ class AdventureOrchestrator:
             if not (f.flight_id in seen_ids or seen_ids.add(f.flight_id))
         ]  # type: ignore[func-returns-value]
 
+        # LATAM "caviar" ordering: sort LATAM last within each date group so
+        # cheaper airlines appear first and LATAM shows as premium option at end.
+        outbound_all.sort(
+            key=lambda f: (
+                f.travel_date,
+                1 if "LATAM" in f.airline.upper() else 0,
+                f.departure_time,
+            )
+        )
+
         all_dates = [f.travel_date for f in outbound_all + return_all]
         matcher = EventMatcher(destinations_path=self._settings.get_destinations_path())
         matcher.load()

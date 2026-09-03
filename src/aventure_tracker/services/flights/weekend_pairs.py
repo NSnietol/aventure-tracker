@@ -179,10 +179,15 @@ def build_weekend_pairs(
             for i, f in enumerate(top3)
         ]
 
+        # Use the actual return date as window_end so the email header shows
+        # the real departure/return span (e.g. "23-26 Oct") instead of the
+        # scan horizon (+5 days = "23-28 Oct").
+        display_end = top3[0].travel_date if top3 else window_end
+
         pairs.append(
             WeekendPair(
                 window_start=window_start,
-                window_end=window_end,
+                window_end=display_end,
                 outbound=outbound,
                 return_options=return_options,
                 events=events,

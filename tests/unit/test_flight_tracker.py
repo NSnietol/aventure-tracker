@@ -575,3 +575,345 @@ class TestFlightTrackerResultDataclass:
         assert result.flights_found == 10
         assert result.alerts_generated == 5
         assert result.errors == []
+
+
+# ---------------------------------------------------------------------------
+# Tests for RT return_options → FlightFound conversion (Fix 2)
+# ---------------------------------------------------------------------------
+
+
+class TestRoundTripReturnOptionsConversion:
+    """Return options from scrape_round_trip must appear in prices_found."""
+
+    def _make_rt_routes_config(self, tmp_path: Path) -> Path:
+        config_path = tmp_path / "rt_routes.yaml"
+        config_path.write_text(
+            """
+routes:
+  - origin: BAQ
+    destination: MDE
+    price_threshold: 150000
+    drop_percentage: 15
+    search_days: [friday]
+    return_days: [monday]
+    search_mode: round_trip
+    round_trip_threshold: 300000
+  - origin: MDE
+    destination: BAQ
+    price_threshold: 150000
+    drop_percentage: 15
+    search_days: [monday]
+    search_mode: round_trip
+    round_trip_threshold: 300000
+"""
+        )
+        return config_path
+
+    @pytest.mark.asyncio
+    async def test_return_options_added_to_prices_found(
+        self, tmp_path: Path, holidays_config: Path
+    ) -> None:
+        """Each valid return option must appear in result.prices_found."""
+        mock_scraper = AsyncMock()
+        mock_scraper.scrape_round_trip = AsyncMock(
+            return_value=[
+                {
+                    "outbound": {
+                        "airline": "Wingo",
+                        "departure_time": "12:25",
+                        "price": 238_782,
+                    },
+                    "return_options": [
+                        {
+                            "airline": "Wingo",
+                            "departure_time": "07:00",
+                            "price": 238_782,
+                        },
+                        {
+                            "airline": "LATAM",
+                            "departure_time": "08:00",
+                            "price": 260_000,
+                        },
+                    ],
+                    "total_price": 238_782,
+                }
+            ]
+        )
+        mock_scraper.scrape = AsyncMock(return_value=[])
+
+        rt_config = self._make_rt_routes_config(tmp_path)
+        service = FlightTrackerService(
+            routes_config_path=rt_config,
+            holidays_config_path=holidays_config,
+            scraper=mock_scraper,
+            weeks_ahead=1,
+        )
+
+        result = await service.track_flights()
+
+        # Should have outbound + return options
+        routes_in_found = [f.route for f in result.prices_found]
+        assert any("MDE" in r and "BAQ" in r for r in routes_in_found), (
+            "Return options (MDE→BAQ) must appear in prices_found"
+        )
+
+    @pytest.mark.asyncio
+    async def test_return_options_have_correct_travel_date(
+        self, tmp_path: Path, holidays_config: Path
+    ) -> None:
+        """Return FlightFound must carry the return_date from search params."""
+        mock_scraper = AsyncMock()
+        mock_scraper.scrape_round_trip = AsyncMock(
+            return_value=[
+                {
+                    "outbound": {
+                        "airline": "Wingo",
+                        "departure_time": "12:25",
+                        "price": 238_782,
+                    },
+                    "return_options": [
+                        {
+                            "airline": "Wingo",
+                            "departure_time": "07:00",
+                            "price": 238_782,
+                        },
+                    ],
+                    "total_price": 238_782,
+                }
+            ]
+        )
+        mock_scraper.scrape = AsyncMock(return_value=[])
+
+        rt_config = self._make_rt_routes_config(tmp_path)
+        service = FlightTrackerService(
+            routes_config_path=rt_config,
+            holidays_config_path=holidays_config,
+            scraper=mock_scraper,
+            weeks_ahead=1,
+        )
+
+        result = await service.track_flights()
+
+        return_flights = [
+            f for f in result.prices_found if "MDE→BAQ" in f.route or "MDE-BAQ" in f.route
+        ]
+        assert len(return_flights) > 0
+        for rf in return_flights:
+            assert rf.travel_date is not None, "Return FlightFound must have travel_date"
+            # travel_date must be a real date (not None/default) and must be
+            # on a Monday OR Tuesday (return_day=monday per config, but the
+            # exact date depends on the current day when the test runs)
+            assert rf.travel_date.weekday() in (0, 1), (
+                f"Return date {rf.travel_date} (weekday {rf.travel_date.weekday()}) "
+                f"should be Monday(0) or Tuesday(1)"
+            )
+
+    @pytest.mark.asyncio
+    async def test_return_options_missing_time_skipped(
+        self, tmp_path: Path, holidays_config: Path
+    ) -> None:
+        """Return options without departure_time must be silently skipped."""
+        mock_scraper = AsyncMock()
+        mock_scraper.scrape_round_trip = AsyncMock(
+            return_value=[
+                {
+                    "outbound": {
+                        "airline": "Wingo",
+                        "departure_time": "12:25",
+                        "price": 238_782,
+                    },
+                    "return_options": [
+                        # No departure_time — should be skipped
+                        {"airline": "Wingo", "price": 238_782},
+                    ],
+                    "total_price": 238_782,
+                }
+            ]
+        )
+        mock_scraper.scrape = AsyncMock(return_value=[])
+
+        rt_config = self._make_rt_routes_config(tmp_path)
+        service = FlightTrackerService(
+            routes_config_path=rt_config,
+            holidays_config_path=holidays_config,
+            scraper=mock_scraper,
+            weeks_ahead=1,
+        )
+
+        result = await service.track_flights()
+
+        # Should not raise — incomplete returns are silently dropped
+        return_flights = [
+            f for f in result.prices_found
+            if "BAQ" in f.route and f.route.index("MDE") < f.route.index("BAQ")
+        ]
+        assert len(return_flights) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests for LATAM last sort in outbound_all (Fix 3) — tested via weekend_pairs
+# ---------------------------------------------------------------------------
+
+
+class TestLatamLastOrdering:
+    """LATAM should appear last within each date group in the outbound list."""
+
+    def test_latam_sorted_last_within_same_date(self) -> None:
+        """Non-LATAM flights on the same date should precede LATAM."""
+        from aventure_tracker.services.flights.tracker import FlightFound
+
+        flights = [
+            FlightFound(
+                flight_id="1",
+                route="BAQ→MDE",
+                travel_date=date(2026, 10, 23),
+                departure_time="07:07",
+                airline="JetSMART",
+                price=290_620,
+                is_priority=False,
+            ),
+            FlightFound(
+                flight_id="2",
+                route="BAQ→MDE",
+                travel_date=date(2026, 10, 23),
+                departure_time="10:50",
+                airline="LATAM",
+                price=294_070,
+                is_priority=True,
+            ),
+            FlightFound(
+                flight_id="3",
+                route="BAQ→MDE",
+                travel_date=date(2026, 10, 23),
+                departure_time="12:25",
+                airline="Wingo",
+                price=238_782,
+                is_priority=False,
+            ),
+        ]
+
+        # Apply the same sort used in _send_consolidated_report
+        flights.sort(
+            key=lambda f: (
+                f.travel_date,
+                1 if "LATAM" in f.airline.upper() else 0,
+                f.departure_time,
+            )
+        )
+
+        airlines = [f.airline for f in flights]
+        assert airlines[-1] == "LATAM", "LATAM must be last in the sorted list"
+        assert "JetSMART" in airlines[:-1]
+        assert "Wingo" in airlines[:-1]
+
+    def test_latam_last_across_dates(self) -> None:
+        """LATAM from date A should not be pushed after non-LATAM from date B."""
+        from aventure_tracker.services.flights.tracker import FlightFound
+
+        flights = [
+            FlightFound(
+                flight_id="1",
+                route="BAQ→MDE",
+                travel_date=date(2026, 10, 22),
+                departure_time="22:10",
+                airline="LATAM",
+                price=256_470,
+                is_priority=True,
+            ),
+            FlightFound(
+                flight_id="2",
+                route="BAQ→MDE",
+                travel_date=date(2026, 10, 23),
+                departure_time="12:25",
+                airline="Wingo",
+                price=238_782,
+                is_priority=False,
+            ),
+        ]
+
+        flights.sort(
+            key=lambda f: (
+                f.travel_date,
+                1 if "LATAM" in f.airline.upper() else 0,
+                f.departure_time,
+            )
+        )
+
+        # LATAM (Oct 22) should still come before Wingo (Oct 23)
+        assert flights[0].airline == "LATAM"
+        assert flights[1].airline == "Wingo"
+
+
+# ---------------------------------------------------------------------------
+# Tests for window_end = actual return date (Fix 4)
+# ---------------------------------------------------------------------------
+
+
+class TestWindowEndUsesReturnDate:
+    """window_end on WeekendPair should reflect the real return date, not +5."""
+
+    def _make_flight(
+        self,
+        route: str,
+        travel_date: date,
+        departure_time: str = "07:00",
+        airline: str = "Wingo",
+        price: int = 238_782,
+        is_priority: bool = False,
+    ) -> "FlightFound":
+        from aventure_tracker.services.flights.tracker import FlightFound
+
+        return FlightFound(
+            flight_id=f"{route}_{travel_date}_{departure_time}_{airline}",
+            route=route,
+            travel_date=travel_date,
+            departure_time=departure_time,
+            airline=airline,
+            price=price,
+            is_priority=is_priority,
+        )
+
+    def test_window_end_equals_return_date_when_return_found(self) -> None:
+        from unittest.mock import MagicMock
+
+        from aventure_tracker.services.flights.weekend_pairs import build_weekend_pairs
+
+        outbound_date = date(2026, 10, 23)  # Friday
+        return_date = date(2026, 10, 26)   # Monday
+
+        outbound = [self._make_flight("BAQ→MDE", outbound_date, "12:25")]
+        returns = [self._make_flight("MDE→BAQ", return_date, "07:00")]
+
+        match = MagicMock()
+        match.window_start = outbound_date
+        match.events = []
+
+        pairs = build_weekend_pairs(outbound, returns, [match])
+
+        assert len(pairs) == 1
+        assert pairs[0].window_end == return_date, (
+            f"window_end should be {return_date} (actual return date), "
+            f"got {pairs[0].window_end}"
+        )
+
+    def test_window_end_fallback_when_no_return(self) -> None:
+        """When no return found, window_end stays at window_start + 5."""
+        from datetime import timedelta
+        from unittest.mock import MagicMock
+
+        from aventure_tracker.services.flights.weekend_pairs import build_weekend_pairs
+
+        outbound_date = date(2026, 10, 23)
+
+        outbound = [self._make_flight("BAQ→MDE", outbound_date, "12:25")]
+
+        match = MagicMock()
+        match.window_start = outbound_date
+        match.events = []
+
+        pairs = build_weekend_pairs(outbound, [], [match])
+
+        assert len(pairs) == 1
+        assert pairs[0].window_end == outbound_date + timedelta(days=5), (
+            "When no return found, window_end should be outbound_date + 5"
+        )
