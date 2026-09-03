@@ -540,7 +540,9 @@ class FlightTrackerService:
         result: "FlightTrackerResult",
     ) -> None:
         """Track a paired outbound+return route using round-trip search."""
-        logger.info(f"Checking round-trip: {outbound_route} ↔ {return_route.origin}")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"  ROUND-TRIP: {outbound_route} ↔ {return_route.origin}")
+        logger.info(f"{'=' * 60}")
         result.routes_checked += 2  # counts both legs
 
         for weekend in weekends:

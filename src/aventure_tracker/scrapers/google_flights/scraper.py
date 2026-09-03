@@ -241,8 +241,7 @@ class GoogleFlightsScraper(BaseScraper):
             try:
                 consent = ConsentHandler(page)
                 logger.info(
-                    f"Round-trip search: {outbound_route} on {outbound_date} "
-                    f"↔ {return_date}"
+                    f"━━━ RT {outbound_route} on {outbound_date} ↔ {return_date} ━━━"
                 )
 
                 # Step 1: Navigate without 'solo ida' — Google defaults to round-trip mode
