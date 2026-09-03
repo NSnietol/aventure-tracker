@@ -695,11 +695,15 @@ routes:
         result = await service.track_flights()
 
         return_flights = [
-            f for f in result.prices_found if "MDE→BAQ" in f.route or "MDE-BAQ" in f.route
+            f
+            for f in result.prices_found
+            if "MDE→BAQ" in f.route or "MDE-BAQ" in f.route
         ]
         assert len(return_flights) > 0
         for rf in return_flights:
-            assert rf.travel_date is not None, "Return FlightFound must have travel_date"
+            assert rf.travel_date is not None, (
+                "Return FlightFound must have travel_date"
+            )
             # travel_date must be a real date (not None/default) and must be
             # on a Monday OR Tuesday (return_day=monday per config, but the
             # exact date depends on the current day when the test runs)
@@ -744,7 +748,8 @@ routes:
 
         # Should not raise — incomplete returns are silently dropped
         return_flights = [
-            f for f in result.prices_found
+            f
+            for f in result.prices_found
             if "BAQ" in f.route and f.route.index("MDE") < f.route.index("BAQ")
         ]
         assert len(return_flights) == 0
@@ -879,7 +884,7 @@ class TestWindowEndUsesReturnDate:
         from aventure_tracker.services.flights.weekend_pairs import build_weekend_pairs
 
         outbound_date = date(2026, 10, 23)  # Friday
-        return_date = date(2026, 10, 26)   # Monday
+        return_date = date(2026, 10, 26)  # Monday
 
         outbound = [self._make_flight("BAQ→MDE", outbound_date, "12:25")]
         returns = [self._make_flight("MDE→BAQ", return_date, "07:00")]

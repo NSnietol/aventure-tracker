@@ -657,8 +657,8 @@ class FlightTrackerService:
                                     continue
 
                                 # Validate return time window
-                                valid_ret_time, ret_time_rule = self._is_valid_time_for_day(
-                                    ret_time, return_day
+                                valid_ret_time, ret_time_rule = (
+                                    self._is_valid_time_for_day(ret_time, return_day)
                                 )
                                 if not valid_ret_time:
                                     logger.debug(
