@@ -61,6 +61,7 @@ class SearchForm:
             origin_input = await self._page.wait_for_selector(
                 SearchFormLocators.ORIGIN_INPUT,
                 timeout=INTERACTION_TIMEOUT_MS,
+                state="visible",
             )
             if origin_input:
                 await origin_input.click()
@@ -85,6 +86,7 @@ class SearchForm:
             dest_input = await self._page.wait_for_selector(
                 SearchFormLocators.DESTINATION_INPUT,
                 timeout=INTERACTION_TIMEOUT_MS,
+                state="visible",
             )
             if dest_input:
                 await dest_input.click()
@@ -108,6 +110,7 @@ class SearchForm:
             date_input = await self._page.wait_for_selector(
                 SearchFormLocators.DEPARTURE_DATE_INPUT,
                 timeout=INTERACTION_TIMEOUT_MS,
+                state="visible",
             )
             if date_input:
                 await date_input.click()
@@ -157,6 +160,7 @@ class SearchForm:
             return_input = await self._page.wait_for_selector(
                 SearchFormLocators.RETURN_DATE_INPUT,
                 timeout=INTERACTION_TIMEOUT_MS,
+                state="visible",
             )
             if return_input:
                 await return_input.click()
