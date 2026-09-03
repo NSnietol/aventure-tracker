@@ -50,6 +50,36 @@ class SearchForm:
     def __init__(self, page: Page) -> None:
         self._page = page
 
+    async def _find_visible_input(
+        self, selector: str, timeout_ms: int = INTERACTION_TIMEOUT_MS
+    ):
+        """Find the first visible element matching selector.
+
+        Google Flights duplicates several form inputs (visible + hidden copies).
+        wait_for_selector picks the first in DOM order, which is often hidden.
+        This method scans all matches and returns the first visible one.
+
+        Args:
+            selector: CSS selector to match.
+            timeout_ms: Max ms to wait for at least one visible element.
+
+        Returns:
+            The first visible element, or None.
+        """
+        import time as _time
+
+        deadline = _time.monotonic() + timeout_ms / 1000
+        while _time.monotonic() < deadline:
+            elements = await self._page.query_selector_all(selector)
+            for el in elements:
+                try:
+                    if await el.is_visible():
+                        return el
+                except Exception:
+                    continue
+            await self._page.wait_for_timeout(100)
+        return None
+
     async def set_origin(self, airport_code: str) -> None:
         """Set the origin airport.
 
@@ -58,10 +88,8 @@ class SearchForm:
         """
         try:
             # Click on origin input area
-            origin_input = await self._page.wait_for_selector(
-                SearchFormLocators.ORIGIN_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
-                state="visible",
+            origin_input = await self._find_visible_input(
+                SearchFormLocators.ORIGIN_INPUT
             )
             if origin_input:
                 await origin_input.click()
@@ -85,10 +113,8 @@ class SearchForm:
         try:
             # Wait for any open autocomplete from origin to close first
             await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
-            dest_input = await self._page.wait_for_selector(
-                SearchFormLocators.DESTINATION_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
-                state="visible",
+            dest_input = await self._find_visible_input(
+                SearchFormLocators.DESTINATION_INPUT
             )
             if dest_input:
                 await dest_input.click()
@@ -109,10 +135,8 @@ class SearchForm:
             travel_date: The travel date.
         """
         try:
-            date_input = await self._page.wait_for_selector(
-                SearchFormLocators.DEPARTURE_DATE_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
-                state="visible",
+            date_input = await self._find_visible_input(
+                SearchFormLocators.DEPARTURE_DATE_INPUT
             )
             if date_input:
                 await date_input.click()
@@ -159,10 +183,8 @@ class SearchForm:
             return_date: The return travel date.
         """
         try:
-            return_input = await self._page.wait_for_selector(
-                SearchFormLocators.RETURN_DATE_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
-                state="visible",
+            return_input = await self._find_visible_input(
+                SearchFormLocators.RETURN_DATE_INPUT
             )
             if return_input:
                 await return_input.click()
