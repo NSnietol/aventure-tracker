@@ -342,11 +342,12 @@ class TestFindEventsForDates:
         assert len(result) == 2
 
     def test_adjacent_dates_merged_into_one_window(self, matcher: EventMatcher) -> None:
-        # Aug 21, 22, 23 → all fall within the same window
+        # Aug 21, 22, 23 — each creates its own window (no merging)
+        # Each cheap flight date gets its own window so all pairs are represented
         result = matcher.find_events_for_dates(
             [date(2026, 8, 21), date(2026, 8, 22), date(2026, 8, 23)]
         )
-        assert len(result) == 1
+        assert len(result) == 3
 
     def test_no_events_in_window_returns_empty_match(
         self, matcher: EventMatcher
@@ -400,10 +401,12 @@ class TestGroupIntoWindows:
         assert len(windows) == 1
 
     def test_dates_within_same_window_merged(self, matcher: EventMatcher) -> None:
+        # Aug 21, 23, 25 — each creates its own window (no merging of overlapping windows)
+        # New behavior: each unique date is its own window_start
         windows = matcher._group_into_windows(
             [date(2026, 8, 21), date(2026, 8, 23), date(2026, 8, 25)]
         )
-        assert len(windows) == 1
+        assert len(windows) == 3
 
     def test_dates_far_apart_create_separate_windows(
         self, matcher: EventMatcher

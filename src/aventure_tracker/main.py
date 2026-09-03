@@ -289,6 +289,21 @@ class AdventureOrchestrator:
         outbound_all.sort(key=lambda x: (x.travel_date, x.departure_time))
         return_all.sort(key=lambda x: (x.travel_date, x.departure_time))
 
+        # Deduplicate by flight_id — same outbound appears twice when searched
+        # with Sunday AND Monday return dates (two separate RT searches).
+        seen_ids: set[str] = set()
+        outbound_all = [
+            f
+            for f in outbound_all
+            if not (f.flight_id in seen_ids or seen_ids.add(f.flight_id))
+        ]  # type: ignore[func-returns-value]
+        seen_ids.clear()
+        return_all = [
+            f
+            for f in return_all
+            if not (f.flight_id in seen_ids or seen_ids.add(f.flight_id))
+        ]  # type: ignore[func-returns-value]
+
         all_dates = [f.travel_date for f in outbound_all + return_all]
         matcher = EventMatcher(destinations_path=self._settings.get_destinations_path())
         matcher.load()
