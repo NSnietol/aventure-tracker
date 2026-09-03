@@ -124,16 +124,29 @@ def _events_html(events: list) -> str:
     for i, ev in enumerate(events[:6]):
         color = EVENT_COLORS[i % len(EVENT_COLORS)]
         emoji = event_emoji(ev.name)
+        is_manual = getattr(ev, "is_manual", False)
+        manual_badge = (
+            '<span style="font-size:10px;background:#e8f5e9;color:#2d6a4f;'
+            "border-radius:4px;padding:2px 6px;font-family:Arial,sans-serif;"
+            'font-weight:700;margin-left:6px;">📌 manual</span>'
+            if is_manual
+            else ""
+        )
+        price_display = (
+            '<div style="font-size:13px;color:#aaa;font-family:Arial,sans-serif;">—</div>'
+            if ev.price == 0
+            else f'<div style="font-size:16px;font-weight:700;color:{color};font-family:Arial,sans-serif;">{ev.price_formatted}</div>'
+        )
         rows += f"""
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;background:#fff;border-radius:8px;border-left:4px solid {color};">
                   <tr><td style="padding:14px 18px;">
                     <table width="100%"><tr>
                       <td>
-                        <div style="font-size:15px;color:#333;margin-bottom:3px;">{emoji} &nbsp;<strong>{ev.name}</strong></div>
+                        <div style="font-size:15px;color:#333;margin-bottom:3px;">{emoji} &nbsp;<strong>{ev.name}</strong>{manual_badge}</div>
                         <div style="font-size:12px;color:#888;font-family:Arial,sans-serif;">@{ev.agency} &nbsp;·&nbsp; {ev.date_label}</div>
                       </td>
                       <td style="text-align:right;white-space:nowrap;vertical-align:top;">
-                        <div style="font-size:16px;font-weight:700;color:{color};font-family:Arial,sans-serif;">{ev.price_formatted}</div>
+                        {price_display}
                       </td>
                     </tr></table>
                   </td></tr>

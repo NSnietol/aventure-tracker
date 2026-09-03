@@ -108,9 +108,13 @@ def destinations_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def matcher(cache_file: Path, destinations_file: Path) -> EventMatcher:
-    """EventMatcher loaded with test data."""
-    m = EventMatcher(cache_path=cache_file, destinations_path=destinations_file)
+def matcher(cache_file: Path, destinations_file: Path, tmp_path: Path) -> EventMatcher:
+    """EventMatcher loaded with test data (no manual events)."""
+    m = EventMatcher(
+        cache_path=cache_file,
+        destinations_path=destinations_file,
+        manual_events_path=tmp_path / "no_manual.yaml",
+    )
     m.load()
     return m
 
@@ -192,7 +196,10 @@ class TestEventMatcherLoad:
         assert len(matcher._all_events) == 5
 
     def test_missing_cache_loads_empty(self, tmp_path: Path) -> None:
-        m = EventMatcher(cache_path=tmp_path / "nonexistent.yaml")
+        m = EventMatcher(
+            cache_path=tmp_path / "nonexistent.yaml",
+            manual_events_path=tmp_path / "no_manual.yaml",
+        )
         m.load()
         assert m._all_events is not None  # no crash
         assert len(m._all_events) == 0
@@ -203,11 +210,85 @@ class TestEventMatcherLoad:
         m = EventMatcher(
             cache_path=cache_file,
             destinations_path=tmp_path / "nonexistent.yaml",
+            manual_events_path=tmp_path / "no_manual.yaml",
         )
         m.load()
         # No crash, no blacklist
         assert m._destinations is not None
         assert len(m._destinations.get_all_blacklisted()) == 0
+
+
+# ---------------------------------------------------------------------------
+# Manual events tests
+# ---------------------------------------------------------------------------
+
+
+class TestManualEvents:
+    """Tests for manual_events.yaml loading."""
+
+    def test_loads_manual_events(self, tmp_path: Path) -> None:
+        manual = tmp_path / "manual_events.yaml"
+        manual.write_text(
+            "events:\n"
+            "  - name: Reencuentro Grupo Peru\n"
+            "    agency: personal\n"
+            "    date_start: '2026-10-23'\n"
+            "    date_end: '2026-10-26'\n"
+            "    price: 0\n"
+        )
+        m = EventMatcher(
+            cache_path=tmp_path / "no_cache.yaml",
+            manual_events_path=manual,
+        )
+        m.load()
+        assert len(m._all_events) == 1
+        ev = m._all_events[0]
+        assert ev.name == "Reencuentro Grupo Peru"
+        assert ev.is_manual is True
+        assert ev.agency == "personal"
+        assert ev.price == 0
+
+    def test_manual_event_matched_to_window(self, tmp_path: Path) -> None:
+        manual = tmp_path / "manual_events.yaml"
+        manual.write_text(
+            "events:\n"
+            "  - name: Reencuentro Grupo Peru\n"
+            "    agency: personal\n"
+            "    date_start: '2026-10-23'\n"
+            "    date_end: '2026-10-26'\n"
+            "    price: 0\n"
+        )
+        m = EventMatcher(
+            cache_path=tmp_path / "no_cache.yaml",
+            manual_events_path=manual,
+        )
+        m.load()
+        # Outbound Thu Oct 22 → window Oct 22–26 → overlaps manual event Oct 23-26
+        results = m.find_events_for_dates([date(2026, 10, 22)])
+        assert len(results) == 1
+        assert len(results[0].events) == 1
+        assert results[0].events[0].name == "Reencuentro Grupo Peru"
+        assert results[0].events[0].is_manual is True
+
+    def test_missing_manual_file_no_crash(self, tmp_path: Path) -> None:
+        m = EventMatcher(
+            cache_path=tmp_path / "no_cache.yaml",
+            manual_events_path=tmp_path / "nonexistent.yaml",
+        )
+        m.load()  # must not raise
+        assert m._all_events == []
+
+    def test_price_zero_shows_dash_label(self) -> None:
+        ev = MatchedEvent(
+            name="Test",
+            agency="personal",
+            date_start=date(2026, 10, 23),
+            date_end=date(2026, 10, 26),
+            price=0,
+            is_manual=True,
+        )
+        assert ev.price_formatted == "$0"
+        assert ev.is_manual is True
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +366,11 @@ class TestFindEventsForDates:
             "year: 2026, events_count: 0, is_cover: true, "
             "processed_at: '2026-01-01T00:00:00', source_path: x, events_data: []}\n"
         )
-        m = EventMatcher(cache_path=empty_cache, destinations_path=destinations_file)
+        m = EventMatcher(
+            cache_path=empty_cache,
+            destinations_path=destinations_file,
+            manual_events_path=tmp_path / "no_manual.yaml",
+        )
         m.load()
         result = m.find_events_for_dates([date(2026, 8, 23)])
         assert result == []

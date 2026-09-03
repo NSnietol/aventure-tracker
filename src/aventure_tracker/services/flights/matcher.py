@@ -18,6 +18,7 @@ from aventure_tracker.models.activity import DestinationsConfig
 logger = logging.getLogger(__name__)
 
 DEFAULT_CACHE_PATH = Path("data/extraction_cache.yaml")
+DEFAULT_MANUAL_EVENTS_PATH = Path("data/manual_events.yaml")
 DEFAULT_DESTINATIONS_PATH = Path("config/destinations.yaml")
 
 
@@ -32,6 +33,7 @@ class MatchedEvent:
         date_end: End date.
         price: Price in COP.
         sold_out: Whether event is sold out.
+        is_manual: True if added via manual_events.yaml (not extracted from image).
     """
 
     name: str
@@ -40,6 +42,7 @@ class MatchedEvent:
     date_end: date
     price: int
     sold_out: bool = False
+    is_manual: bool = False
 
     @property
     def price_formatted(self) -> str:
@@ -94,21 +97,25 @@ class EventMatcher:
         self,
         cache_path: Path | None = None,
         destinations_path: Path | None = None,
+        manual_events_path: Path | None = None,
     ) -> None:
         """Initialize the matcher.
 
         Args:
             cache_path: Path to extraction_cache.yaml.
             destinations_path: Path to destinations.yaml (blacklist).
+            manual_events_path: Path to manual_events.yaml (optional overrides).
         """
         self._cache_path = cache_path or DEFAULT_CACHE_PATH
         self._destinations_path = destinations_path or DEFAULT_DESTINATIONS_PATH
+        self._manual_events_path = manual_events_path or DEFAULT_MANUAL_EVENTS_PATH
         self._all_events: list[MatchedEvent] = []
         self._destinations: DestinationsConfig | None = None
 
     def load(self) -> None:
-        """Load events from cache and blacklist from destinations."""
+        """Load events from cache + manual file, and blacklist from destinations."""
         self._load_events()
+        self._load_manual_events()
         self._load_blacklist()
 
     def _load_events(self) -> None:
@@ -141,6 +148,42 @@ class EventMatcher:
                     logger.debug(f"Skipping malformed event entry: {e}")
 
         logger.info(f"Loaded {len(self._all_events)} events from extraction cache")
+
+    def _load_manual_events(self) -> None:
+        """Load manually defined events from manual_events.yaml.
+
+        Events in this file are treated identically to extracted events but
+        carry is_manual=True so the email template can badge them differently.
+        File is optional — if it doesn't exist the system works as before.
+        """
+        if not self._manual_events_path.exists():
+            return
+
+        with open(self._manual_events_path, encoding="utf-8") as f:
+            data: dict[str, Any] = yaml.safe_load(f) or {}
+
+        manual = []
+        for ev in data.get("events", []):
+            try:
+                manual.append(
+                    MatchedEvent(
+                        name=ev["name"],
+                        agency=ev.get("agency", "personal"),
+                        date_start=date.fromisoformat(str(ev["date_start"])),
+                        date_end=date.fromisoformat(str(ev["date_end"])),
+                        price=int(ev.get("price", 0)),
+                        sold_out=bool(ev.get("sold_out", False)),
+                        is_manual=True,
+                    )
+                )
+            except (KeyError, ValueError) as e:
+                logger.warning(f"Skipping malformed manual event: {ev} — {e}")
+
+        if manual:
+            self._all_events.extend(manual)
+            logger.info(
+                f"Loaded {len(manual)} manual event(s) from {self._manual_events_path}"
+            )
 
     def _load_blacklist(self) -> None:
         """Load blacklist from destinations config."""

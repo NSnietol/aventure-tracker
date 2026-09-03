@@ -1,4 +1,4 @@
-updated_at: '2026-08-18T07:50:38.893823'
+updated_at: '2026-09-02T19:52:46.445883'
 flights:
   BAQ-MDE_2026-08-13_18:30_LATAM:
     flight_id: BAQ-MDE_2026-08-13_18:30_LATAM
@@ -794,3 +794,79 @@ flights:
       checked_at: '2026-08-18T07:50:37.845675'
     - price: 100000
       checked_at: '2026-08-18T07:50:38.061347'
+  BAQ-MDE_2026-09-03_18:30_LATAM:
+    flight_id: BAQ-MDE_2026-09-03_18:30_LATAM
+    route: BAQ-MDE
+    travel_date: '2026-09-03'
+    departure_time: '18:30'
+    airline: LATAM
+    records:
+    - price: 120000
+      checked_at: '2026-09-02T19:50:44.577569'
+    - price: 100000
+      checked_at: '2026-09-02T19:50:44.816350'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:16.143870'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:16.379065'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:45.396128'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:45.647072'
+  BAQ-MDE_2026-09-10_18:30_LATAM:
+    flight_id: BAQ-MDE_2026-09-10_18:30_LATAM
+    route: BAQ-MDE
+    travel_date: '2026-09-10'
+    departure_time: '18:30'
+    airline: LATAM
+    records:
+    - price: 120000
+      checked_at: '2026-09-02T19:50:44.577628'
+    - price: 100000
+      checked_at: '2026-09-02T19:50:44.816530'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:16.143936'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:16.379138'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:45.396235'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:45.647160'
+  CTG-MDE_2026-09-03_18:30_LATAM:
+    flight_id: CTG-MDE_2026-09-03_18:30_LATAM
+    route: CTG-MDE
+    travel_date: '2026-09-03'
+    departure_time: '18:30'
+    airline: LATAM
+    records:
+    - price: 120000
+      checked_at: '2026-09-02T19:50:44.577662'
+    - price: 100000
+      checked_at: '2026-09-02T19:50:44.816639'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:16.143974'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:16.379189'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:45.396300'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:45.647224'
+  CTG-MDE_2026-09-10_18:30_LATAM:
+    flight_id: CTG-MDE_2026-09-10_18:30_LATAM
+    route: CTG-MDE
+    travel_date: '2026-09-10'
+    departure_time: '18:30'
+    airline: LATAM
+    records:
+    - price: 120000
+      checked_at: '2026-09-02T19:50:44.577688'
+    - price: 100000
+      checked_at: '2026-09-02T19:50:44.816738'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:16.144008'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:16.379234'
+    - price: 120000
+      checked_at: '2026-09-02T19:52:45.396351'
+    - price: 100000
+      checked_at: '2026-09-02T19:52:45.647279'

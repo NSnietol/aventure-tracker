@@ -1,0 +1,23 @@
+# =============================================================================
+# Manual Events
+# =============================================================================
+# Events added directly without going through the OCR/inbox pipeline.
+# These appear in the email report alongside extracted events, marked 📌 manual.
+#
+# Fields:
+#   name:       Event display name
+#   agency:     Label shown in email (use "personal" if no agency)
+#   date_start: ISO date YYYY-MM-DD (first day of the event)
+#   date_end:   ISO date YYYY-MM-DD (last day of the event)
+#   price:      Price in COP (use 0 if unknown or not relevant)
+#   sold_out:   true/false (optional, default false)
+#   notes:      Optional description (not shown in email)
+# =============================================================================
+
+events:
+  - name: "Reencuentro Grupo Peru"
+    agency: "personal"
+    date_start: "2026-10-23"
+    date_end: "2026-10-26"
+    price: 0
+    notes: "Evento manual Oct 23/24-26"

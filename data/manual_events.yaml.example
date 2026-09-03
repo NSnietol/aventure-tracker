@@ -1,0 +1,23 @@
+# =============================================================================
+# manual_events.yaml — Example / Template
+# =============================================================================
+# Copy this file to data/manual_events.yaml and fill in your events.
+# The file is loaded automatically on every run alongside extraction_cache.yaml.
+#
+# Events appear in the email report with a 📌 manual badge.
+# price: 0 shows a dash instead of a price in the email.
+# =============================================================================
+
+events:
+  - name: "Nombre del evento"
+    agency: "personal"
+    date_start: "2026-10-23"
+    date_end: "2026-10-26"
+    price: 0
+    notes: "Descripción opcional"
+
+  - name: "Otro evento con precio"
+    agency: "brutaltravel.co"
+    date_start: "2026-11-07"
+    date_end: "2026-11-08"
+    price: 180000
