@@ -669,7 +669,15 @@ class FlightTrackerService:
             if previous_price > 0:
                 price_change_pct = round((price_change / previous_price) * 100, 1)
 
-        is_below_threshold = flight.price <= route_config.price_threshold
+        from aventure_tracker.models.flight import SearchMode
+
+        # In round-trip mode, compare total price against round_trip_threshold
+        threshold = (
+            route_config.effective_round_trip_threshold
+            if route_config.search_mode == SearchMode.ROUND_TRIP
+            else route_config.price_threshold
+        )
+        is_below_threshold = flight.price <= threshold
         is_significant_drop = (
             price_change_pct is not None
             and price_change_pct < 0
