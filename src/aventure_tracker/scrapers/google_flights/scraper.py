@@ -286,7 +286,10 @@ class GoogleFlightsScraper(BaseScraper):
                             logger.debug(f"  Card index {card_index} out of range")
                             continue
 
-                        await cards_now[card_index].click()
+                        # Use JS click to bypass overlay elements that intercept pointer events
+                        await page.evaluate(
+                            f'document.querySelectorAll(\'[role="link"][aria-label*="pesos colombianos"]\')[{card_index}]?.click()'
+                        )
                         await self._add_human_delay(1500, 2500)
 
                         return_page = ResultsPage(page)
