@@ -71,6 +71,10 @@ class GoogleFlightsScraper(BaseScraper):
 
         if return_date:
             query_parts.append(f"vuelta {return_date.strftime('%Y-%m-%d')}")
+        else:
+            # Explicitly request one-way so Google doesn't default to round-trip
+            # and return combined round-trip prices instead of per-leg prices.
+            query_parts.append("solo ida")
 
         query = " ".join(query_parts)
 

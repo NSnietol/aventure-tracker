@@ -376,6 +376,11 @@ class ResultsPage:
                 "stops": 0,
             }
 
+            # Skip round-trip cards — we only search one-way
+            if "ida y vuelta" in aria_label.lower():
+                logger.debug("Skipping round-trip card (one-way search only)")
+                return None
+
             # Extract price: "desde NNNNNN pesos colombianos"
             price_match = re.search(r"desde\s+(\d+)\s+pesos", aria_label)
             if price_match:
