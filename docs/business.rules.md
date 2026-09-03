@@ -39,12 +39,12 @@ El día y ventana válidos dependen de **cuándo empieza la aventura en MDE**:
 |-----------------------|-----------------------------|------------------------|-------------------------------------------------------------|
 | Jueves tarde          | Jueves                      | 18:00 – 23:59          | Llegar esa misma noche antes de que empiece el plan         |
 | Viernes (cualquier hora) | Jueves o viernes         | Jue 18:00–23:59 / Vie 00:00–16:00 | Llegar el jueves noche o el viernes en la mañana/tarde |
-| Sábado                | Viernes (**obligatorio**)   | 00:00 – 16:00          | Las aventuras empiezan a las 6AM en MDE; salir de BAQ a las 3AM no es viable |
+| Sábado                | Viernes (**obligatorio**)   | 00:00 – **19:30**      | Aventura empieza sábado — se puede volar el viernes hasta las 7:30 PM |
 
 - Si la aventura **empieza el viernes por la noche**: vuelo del viernes con llegada antes de las 4PM es **obligatorio**.
-- Si la aventura **empieza el sábado**: vuelo del viernes ≤ 4PM es **obligatorio**. Las aventuras arrancan a las 6AM en MDE — salir de BAQ a las 3AM para conectar no es viable.
+- Si la aventura **empieza el sábado**: vuelo del viernes hasta las **7:30 PM** es válido (tiempo suficiente para llegar a MDE esa noche y estar listo el sábado temprano).
 - Si la aventura **empieza el jueves tarde**: hay que buscar vuelo el jueves.
-- El cutoff de las **16:00 del viernes** aplica en todos los casos donde la aventura empieza el viernes o el sábado.
+- El `TIME_FILTER` del viernes usa la ventana amplia (19:30). El filtro fino para eventos del viernes se aplica en `_build_weekend_pairs()` cuando se conocen los eventos.
 
 #### Vuelos de vuelta (MDE → BAQ)
 
@@ -66,7 +66,7 @@ El día válido depende de **cuándo termina la aventura en MDE** y del tramo ex
 | Día de vuelo  | Ventana válida     | Cuándo aplica                                                                |
 |---------------|--------------------|---------------------------------------------------------------------------  |
 | Jueves        | 18:00 – 23:59      | Aventura empieza el jueves tarde o el viernes                                |
-| Viernes       | 00:00 – 16:00      | Aventura empieza el viernes **o el sábado** (obligatorio en ambos casos)     |
+| Viernes       | 00:00 – **19:30**  | Evento viernes → llegar antes 16:00 / Evento sábado → hasta 19:30           |
 | Domingo       | ≥ 11:00            | Solo si aventura es exclusivamente de sábado (`sunday_adventure = False`)    |
 | Lunes         | 00:00 – 10:00      | Aventura termina el domingo en MDE (~8PM, no es posible volar ese día)       |
 | Martes        | 00:00 – 10:00      | Aventura termina el lunes en MDE                                             |

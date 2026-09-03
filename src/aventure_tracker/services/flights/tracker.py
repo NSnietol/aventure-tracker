@@ -20,18 +20,13 @@ from aventure_tracker.services.shared.holidays import HolidayService
 
 logger = logging.getLogger(__name__)
 
-# Time filters by day of week
-# IMPORTANT: These filters run BEFORE _build_weekend_pairs().
-# - SUNDAY is intentionally absent: whether a Sunday return is valid
-#   depends on the adventure context (saturday-only vs multi-day).
-#   That decision is made in _build_weekend_pairs(), not here.
-# - SATURDAY is absent: not a valid search day per business rules.
-# - TUESDAY uses a wide early-morning window to cover the case where
-#   the adventure ends Monday in MDE and the user flies home Tuesday.
+# Time filters by day of week — DEPRECATED in favor of time_windows in routes.yaml.
+# Kept as fallback if routes.yaml doesn't define time_windows.
 TIME_FILTERS: dict[SearchDay, tuple[time, time]] = {
     SearchDay.THURSDAY: (time(18, 0), time(23, 59)),
     SearchDay.FRIDAY: (time(0, 0), time(16, 0)),
     SearchDay.MONDAY: (time(0, 0), time(10, 0)),
+    SearchDay.TUESDAY: (time(0, 0), time(10, 0)),
 }
 
 
@@ -305,31 +300,51 @@ class FlightTrackerService:
 
     def _is_valid_time_for_day(
         self, departure_time: str, search_day: SearchDay
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """Check if departure time is valid for the search day.
+
+        Uses time_windows from routes.yaml when available, falls back to
+        the hardcoded TIME_FILTERS.
 
         Args:
             departure_time: Time in HH:MM format.
             search_day: The day being searched.
 
         Returns:
-            True if time is within valid window for that day.
+            Tuple of (is_valid, reason). reason describes the exact rule
+            that was applied (used in skip log messages).
         """
         if not departure_time:
-            return True  # Accept if time not extracted
+            return True, "no time — accepted by default"
 
         try:
             hour, minute = map(int, departure_time.split(":"))
             flight_time = time(hour, minute)
         except (ValueError, AttributeError):
-            return True  # Accept if parsing fails
+            return True, "time unparseable — accepted by default"
 
+        # Prefer time_windows from loaded routes config
+        routes = self._load_routes()
+        day_key = search_day.value  # e.g. "friday"
+        window_cfg = routes.time_windows.get(day_key)
+
+        if window_cfg is not None:
+            valid = window_cfg.contains(departure_time)
+            rule = (
+                f"time_windows.{day_key}: {window_cfg.from_time}–{window_cfg.to_time}"
+                f" ({window_cfg.note})"
+            )
+            return valid, rule
+
+        # Fallback to hardcoded TIME_FILTERS
         time_range = TIME_FILTERS.get(search_day)
         if not time_range:
-            return True  # No filter for this day
+            return True, f"no window defined for {search_day.value} — accepted"
 
         min_time, max_time = time_range
-        return min_time <= flight_time <= max_time
+        valid = min_time <= flight_time <= max_time
+        rule = f"TIME_FILTERS[{search_day.value}]: {min_time.strftime('%H:%M')}–{max_time.strftime('%H:%M')}"
+        return valid, rule
 
     def _should_track_flight(self, flight: FlightResult, route: RouteConfig) -> bool:
         """Determine if a flight should be tracked using AirlinePolicy.
@@ -483,12 +498,13 @@ class FlightTrackerService:
 
                     for flight in flights:
                         departure_time_str = flight.departure_time.strftime("%H:%M")
-                        if not self._is_valid_time_for_day(
+                        valid_time, time_rule = self._is_valid_time_for_day(
                             departure_time_str, search_day
-                        ):
+                        )
+                        if not valid_time:
                             logger.debug(
                                 f"    Skipping {flight.airline} {departure_time_str}: "
-                                f"outside time window for {search_day.value}"
+                                f"outside time window — rule: {time_rule}"
                             )
                             continue
 
@@ -588,10 +604,13 @@ class FlightTrackerService:
                             returns = pair.get("return_options", [])
 
                             out_time = out.get("departure_time", "")
-                            if not self._is_valid_time_for_day(out_time, outbound_day):
+                            valid_time, time_rule = self._is_valid_time_for_day(
+                                out_time, outbound_day
+                            )
+                            if not valid_time:
                                 logger.debug(
                                     f"    Skipping outbound {out.get('airline')} "
-                                    f"{out_time}: outside time window"
+                                    f"{out_time}: outside time window — rule: {time_rule}"
                                 )
                                 continue
 

@@ -12,6 +12,37 @@
 #   - return_days: valid days for the return leg
 
 # =============================================================================
+# Time Windows
+# =============================================================================
+# Valid departure time ranges per search day.
+# Flights outside these windows are discarded before price evaluation.
+#
+# NOTE: Sunday is intentionally absent — the decision to allow Sunday returns
+# depends on whether events fall on Sunday (sunday_adventure flag), and is
+# handled exclusively in weekend_pairs.py, not here.
+time_windows:
+  thursday:
+    from: "18:00"
+    to: "23:59"
+    note: "Aventura empieza el jueves tarde o el viernes — llegar esa noche"
+  friday:
+    from: "00:00"
+    to: "19:30"
+    note: >
+      Dos sub-casos: si evento es el viernes -> llegar antes 4PM (16:00).
+      Si evento es el sabado -> puede volar hasta las 7:30PM del viernes.
+      Se usa la ventana amplia (19:30); el filtro fino por evento-viernes
+      se aplica en weekend_pairs.py cuando se conocen los eventos.
+  monday:
+    from: "00:00"
+    to: "10:00"
+    note: "Aventura termina el domingo en MDE (~8PM) — imposible volar ese dia"
+  tuesday:
+    from: "00:00"
+    to: "10:00"
+    note: "Aventura termina el lunes en MDE — volar martes temprano"
+
+# =============================================================================
 # Airline Policy
 # =============================================================================
 airline_policy:
