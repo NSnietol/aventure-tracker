@@ -329,8 +329,12 @@ class ResultsPage:
 
         return sorted(prices)
 
-    async def get_flight_details(self) -> list[dict]:
+    async def get_flight_details(self, accept_round_trip: bool = False) -> list[dict]:
         """Extract detailed flight information.
+
+        Args:
+            accept_round_trip: When True, accept cards showing combined round-trip
+                prices (used on the return screen of a round-trip search).
 
         Returns:
             List of flight detail dictionaries.
@@ -344,7 +348,9 @@ class ResultsPage:
 
             for card in cards[:10]:  # Limit to first 10 results
                 try:
-                    flight = await self._extract_flight_from_card(card)
+                    flight = await self._extract_flight_from_card(
+                        card, accept_round_trip=accept_round_trip
+                    )
                     if flight:
                         flights.append(flight)
                 except Exception as e:
@@ -401,11 +407,14 @@ class ResultsPage:
 
         return flights
 
-    async def _extract_flight_from_card(self, card) -> dict | None:
+    async def _extract_flight_from_card(
+        self, card, accept_round_trip: bool = False
+    ) -> dict | None:
         """Extract flight info from a result card.
 
         Args:
             card: The card element.
+            accept_round_trip: When True, accept cards with round-trip prices.
 
         Returns:
             Flight info dictionary or None.
@@ -416,7 +425,9 @@ class ResultsPage:
             if link_elem:
                 aria_label = await link_elem.get_attribute("aria-label")
                 if aria_label:
-                    result = self._parse_aria_label(aria_label)
+                    result = self._parse_aria_label(
+                        aria_label, accept_round_trip=accept_round_trip
+                    )
                     if result and result.get("price"):
                         return result
 

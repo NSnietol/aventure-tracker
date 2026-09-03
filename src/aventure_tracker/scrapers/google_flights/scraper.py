@@ -302,7 +302,9 @@ class GoogleFlightsScraper(BaseScraper):
                             await results_page.wait_for_results(timeout_ms=8000)
                             continue
 
-                        return_flights = await return_page.get_flight_details()
+                        return_flights = await return_page.get_flight_details(
+                            accept_round_trip=True
+                        )
                         logger.info(f"  Found {len(return_flights)} return options")
 
                         results.append(
