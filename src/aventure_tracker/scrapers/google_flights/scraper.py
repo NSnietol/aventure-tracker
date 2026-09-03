@@ -258,53 +258,48 @@ class GoogleFlightsScraper(BaseScraper):
                 await self._add_human_delay(1000, 1500)
 
                 # Step 2: Switch to round-trip via the trip-type combobox.
-                # This makes Google add a return date picker without needing
-                # complex form interaction.
+                # The combobox is in the search bar at the top — scroll to top first.
                 try:
-                    trip_btn = await page.query_selector(
-                        "div[data-value='2'][role='option'], "
-                        "[jsname='nFzMBd'], "
-                        "div[aria-label*='tipo de boleto']"
-                    )
-                    if not trip_btn:
-                        # Click the combobox to open it
-                        combobox = await page.query_selector(
-                            "[aria-label*='tipo de boleto']"
-                        )
-                        if combobox:
-                            await combobox.click()
-                            await self._add_human_delay(300, 500)
-                        # Select "Ida y vuelta" option (data-value="1")
-                        rt_option = await page.query_selector(
-                            "[role='option'][data-value='1']"
-                        )
-                        if rt_option:
-                            await rt_option.click()
-                            await self._add_human_delay(500, 800)
+                    await page.evaluate("window.scrollTo(0, 0)")
+                    await self._add_human_delay(300, 500)
 
-                    # Step 3: Set the return date via the calendar
-                    return_input = await page.query_selector(
-                        "input[aria-label='Regreso'], input[placeholder='Regreso']"
+                    # Click the combobox to open the trip-type dropdown
+                    combobox = await page.query_selector(
+                        "[aria-label*='tipo de boleto'], "
+                        "[data-value='2']"  # data-value='2' = Solo ida (currently selected)
                     )
-                    if return_input:
+                    if combobox:
                         await page.evaluate(
-                            "document.querySelector(\"input[aria-label='Regreso'], "
-                            "input[placeholder='Regreso']\")?.click()"
+                            "document.querySelector(\"[aria-label*='tipo de boleto']\")?.click()"
                         )
                         await self._add_human_delay(300, 500)
-                        date_sel = f"[data-iso='{return_date.isoformat()}']"
+                        # Select "Ida y vuelta" option (data-value="1")
+                        await page.evaluate(
+                            "document.querySelector(\"[role='option'][data-value='1']\")?.click()"
+                        )
+                        await self._add_human_delay(500, 800)
+
+                    # Step 3: Set the return date
+                    await page.evaluate(
+                        "document.querySelector(\"input[aria-label='Regreso'], "
+                        "input[placeholder='Regreso']\")?.click()"
+                    )
+                    await self._add_human_delay(500, 800)
+                    date_sel = f"[data-iso='{return_date.isoformat()}']"
+                    try:
                         await page.wait_for_selector(date_sel, timeout=5000)
                         await page.evaluate(
                             f"document.querySelector(\"[data-iso='{return_date.isoformat()}']\")?.click()"
                         )
                         await self._add_human_delay(300, 500)
-                        # Click done/search
-                        done = await page.query_selector(
-                            "button[jsname='c6xFrd'], button[aria-label='Buscar']"
-                        )
-                        if done:
-                            await done.click()
-                        await self._add_human_delay(2000, 3000)
+                    except Exception:
+                        pass
+                    # Click search/done
+                    await page.evaluate(
+                        "document.querySelector(\"button[jsname='c6xFrd'], "
+                        "button[aria-label='Buscar']\")?.click()"
+                    )
+                    await self._add_human_delay(2000, 3000)
 
                 except Exception as e:
                     logger.warning(f"Could not switch to round-trip mode: {e}")
