@@ -533,6 +533,11 @@ async def async_main(args: argparse.Namespace) -> int:
 
 def main() -> int:
     """CLI entry point."""
+    import warnings
+
+    # Suppress asyncio subprocess cleanup noise at exit (harmless Python/asyncio artifact)
+    warnings.filterwarnings("ignore", category=RuntimeWarning, module="asyncio")
+
     parser = create_parser()
     args = parser.parse_args()
     try:

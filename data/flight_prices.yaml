@@ -1,4 +1,4 @@
-updated_at: '2026-09-02T19:52:46.445883'
+updated_at: '2026-09-02T20:31:57.713048'
 flights:
   BAQ-MDE_2026-08-13_18:30_LATAM:
     flight_id: BAQ-MDE_2026-08-13_18:30_LATAM
@@ -813,6 +813,10 @@ flights:
       checked_at: '2026-09-02T19:52:45.396128'
     - price: 100000
       checked_at: '2026-09-02T19:52:45.647072'
+    - price: 120000
+      checked_at: '2026-09-02T20:31:56.756310'
+    - price: 100000
+      checked_at: '2026-09-02T20:31:56.999055'
   BAQ-MDE_2026-09-10_18:30_LATAM:
     flight_id: BAQ-MDE_2026-09-10_18:30_LATAM
     route: BAQ-MDE
@@ -832,6 +836,10 @@ flights:
       checked_at: '2026-09-02T19:52:45.396235'
     - price: 100000
       checked_at: '2026-09-02T19:52:45.647160'
+    - price: 120000
+      checked_at: '2026-09-02T20:31:56.756388'
+    - price: 100000
+      checked_at: '2026-09-02T20:31:56.999100'
   CTG-MDE_2026-09-03_18:30_LATAM:
     flight_id: CTG-MDE_2026-09-03_18:30_LATAM
     route: CTG-MDE
@@ -851,6 +859,10 @@ flights:
       checked_at: '2026-09-02T19:52:45.396300'
     - price: 100000
       checked_at: '2026-09-02T19:52:45.647224'
+    - price: 120000
+      checked_at: '2026-09-02T20:31:56.756434'
+    - price: 100000
+      checked_at: '2026-09-02T20:31:56.999127'
   CTG-MDE_2026-09-10_18:30_LATAM:
     flight_id: CTG-MDE_2026-09-10_18:30_LATAM
     route: CTG-MDE
@@ -870,3 +882,7 @@ flights:
       checked_at: '2026-09-02T19:52:45.396351'
     - price: 100000
       checked_at: '2026-09-02T19:52:45.647279'
+    - price: 120000
+      checked_at: '2026-09-02T20:31:56.756471'
+    - price: 100000
+      checked_at: '2026-09-02T20:31:56.999150'

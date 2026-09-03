@@ -54,6 +54,7 @@ markers = [
 addopts = "-v --tb=short"
 filterwarnings = [
     "ignore::ResourceWarning",
+    "ignore::RuntimeWarning:asyncio",
 ]
 
 [tool.coverage.run]

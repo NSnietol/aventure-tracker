@@ -50,6 +50,36 @@ class SearchForm:
     def __init__(self, page: Page) -> None:
         self._page = page
 
+    async def _find_visible_input(
+        self, selector: str, timeout_ms: int = INTERACTION_TIMEOUT_MS
+    ):
+        """Find the first visible element matching selector.
+
+        Google Flights duplicates several form inputs (visible + hidden copies).
+        wait_for_selector picks the first in DOM order, which is often hidden.
+        This method scans all matches and returns the first visible one.
+
+        Args:
+            selector: CSS selector to match.
+            timeout_ms: Max ms to wait for at least one visible element.
+
+        Returns:
+            The first visible element, or None.
+        """
+        import time as _time
+
+        deadline = _time.monotonic() + timeout_ms / 1000
+        while _time.monotonic() < deadline:
+            elements = await self._page.query_selector_all(selector)
+            for el in elements:
+                try:
+                    if await el.is_visible():
+                        return el
+                except Exception:
+                    continue
+            await self._page.wait_for_timeout(100)
+        return None
+
     async def set_origin(self, airport_code: str) -> None:
         """Set the origin airport.
 
@@ -58,9 +88,8 @@ class SearchForm:
         """
         try:
             # Click on origin input area
-            origin_input = await self._page.wait_for_selector(
-                SearchFormLocators.ORIGIN_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
+            origin_input = await self._find_visible_input(
+                SearchFormLocators.ORIGIN_INPUT
             )
             if origin_input:
                 await origin_input.click()
@@ -82,9 +111,10 @@ class SearchForm:
             airport_code: IATA airport code (e.g., "MDE").
         """
         try:
-            dest_input = await self._page.wait_for_selector(
-                SearchFormLocators.DESTINATION_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
+            # Wait for any open autocomplete from origin to close first
+            await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
+            dest_input = await self._find_visible_input(
+                SearchFormLocators.DESTINATION_INPUT
             )
             if dest_input:
                 await dest_input.click()
@@ -105,28 +135,35 @@ class SearchForm:
             travel_date: The travel date.
         """
         try:
-            date_input = await self._page.wait_for_selector(
-                SearchFormLocators.DEPARTURE_DATE_INPUT,
-                timeout=INTERACTION_TIMEOUT_MS,
+            date_input = await self._find_visible_input(
+                SearchFormLocators.DEPARTURE_DATE_INPUT
             )
             if date_input:
                 await date_input.click()
-                # Select date from calendar
+                # Select date from calendar — use JS click to bypass overlay elements
                 date_selector = f"[data-iso='{travel_date.isoformat()}']"
                 await self._page.wait_for_selector(
                     date_selector, timeout=INTERACTION_TIMEOUT_MS
                 )
-                await self._page.click(date_selector)
+                await self._page.evaluate(
+                    f"document.querySelector(\"[data-iso='{travel_date.isoformat()}']\").click()"
+                )
 
-                # Click done button if present
+                # Click done button if present — use JS to avoid overlay
                 try:
                     done_btn = await self._page.query_selector(
                         SearchFormLocators.CALENDAR_DONE_BUTTON
                     )
                     if done_btn:
-                        await done_btn.click()
+                        await self._page.evaluate(
+                            f"document.querySelector('{SearchFormLocators.CALENDAR_DONE_BUTTON}')?.click()"
+                        )
                 except Exception:
                     pass
+
+                # Press Escape to close any remaining dialog/modal
+                await self._page.keyboard.press("Escape")
+                await self._page.wait_for_timeout(ANIMATION_PAUSE_MS)
 
                 logger.debug(f"Set departure date: {travel_date}")
         except Exception as e:
@@ -147,12 +184,46 @@ class SearchForm:
         except Exception as e:
             logger.debug(f"Could not select one-way: {e}")
 
+    async def set_return_date(self, return_date: date) -> None:
+        """Set the return date for round-trip search.
+
+        Args:
+            return_date: The return travel date.
+        """
+        try:
+            return_input = await self._find_visible_input(
+                SearchFormLocators.RETURN_DATE_INPUT
+            )
+            if return_input:
+                # Use JS click to bypass any overlay (price chart modal) that
+                # may still be open after departure date selection
+                await self._page.evaluate(
+                    f'document.querySelector("{SearchFormLocators.RETURN_DATE_INPUT}")?.click()'
+                )
+                date_selector = f"[data-iso='{return_date.isoformat()}']"
+                await self._page.wait_for_selector(
+                    date_selector, timeout=INTERACTION_TIMEOUT_MS
+                )
+                await self._page.evaluate(
+                    f"document.querySelector(\"[data-iso='{return_date.isoformat()}']\").click()"
+                )
+                try:
+                    done_btn = await self._page.query_selector(
+                        SearchFormLocators.CALENDAR_DONE_BUTTON
+                    )
+                    if done_btn:
+                        await done_btn.click()
+                except Exception:
+                    pass
+                logger.debug(f"Set return date: {return_date}")
+        except Exception as e:
+            logger.warning(f"Failed to set return date {return_date}: {e}")
+
     async def submit_search(self) -> None:
         """Click the search button."""
         try:
-            search_btn = await self._page.wait_for_selector(
-                SearchFormLocators.SEARCH_BUTTON,
-                timeout=INTERACTION_TIMEOUT_MS,
+            search_btn = await self._find_visible_input(
+                SearchFormLocators.SEARCH_BUTTON
             )
             if search_btn:
                 await search_btn.click()
@@ -284,6 +355,48 @@ class ResultsPage:
 
         except Exception as e:
             logger.error(f"Error extracting flight details: {e}")
+
+        return flights
+
+    async def get_flight_details_with_hrefs(self) -> list[dict]:
+        """Extract flight details for round-trip outbound selection.
+
+        Flight cards are <div role="link" jsaction="click:..."> elements
+        with NO href attribute — the URL is generated dynamically on click.
+        We extract flight data from aria-labels and store the card index
+        so scrape_round_trip can click them by position.
+
+        Returns:
+            List of flight detail dicts. Each dict has an 'href' key
+            (empty string — click-based navigation is used instead).
+        """
+        flights: list[dict] = []
+
+        try:
+            # Flight cards are <div role="link"> with aria-label containing price info
+            cards = await self._page.query_selector_all(
+                "[role='link'][aria-label*='pesos colombianos']"
+            )
+            logger.debug(f"Found {len(cards)} flight card elements")
+
+            for i, card in enumerate(cards[:8]):
+                try:
+                    aria = await card.get_attribute("aria-label") or ""
+                    flight = self._parse_aria_label(aria)
+                    if not flight:
+                        continue
+                    # No href available — caller must click by card index
+                    flight["href"] = ""
+                    flight["_card_index"] = i
+                    flights.append(flight)
+                except Exception as e:
+                    logger.debug(f"Could not extract flight card {i}: {e}")
+                    continue
+
+            logger.debug(f"Extracted {len(flights)} flight details with hrefs")
+
+        except Exception as e:
+            logger.error(f"Error extracting flight details with hrefs: {e}")
 
         return flights
 

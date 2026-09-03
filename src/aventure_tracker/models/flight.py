@@ -154,15 +154,26 @@ class AirlinePolicy(BaseModel):
         )
 
 
+class SearchMode(str, Enum):
+    """Search mode for a route."""
+
+    ONE_WAY = "one_way"
+    ROUND_TRIP = "round_trip"
+
+
 class RouteConfig(BaseModel):
     """Configuration for a flight route to monitor.
 
     Attributes:
         origin: IATA airport code for departure (e.g., "BAQ").
         destination: IATA airport code for arrival (e.g., "MDE").
-        price_threshold: Maximum price in COP to trigger notification.
+        price_threshold: Maximum one-way price in COP (used in one_way mode).
+        round_trip_threshold: Maximum combined round-trip price in COP (used in
+            round_trip mode). If not set, defaults to 2 × price_threshold.
         drop_percentage: Minimum price drop percentage to trigger notification.
-        search_days: Days of the week to search for this route.
+        search_days: Days of the week to search for outbound flights.
+        return_days: Days of the week valid for the return leg (round_trip mode).
+        search_mode: Whether to search one-way or round-trip.
     """
 
     origin: str = Field(
@@ -171,14 +182,34 @@ class RouteConfig(BaseModel):
     destination: str = Field(
         ..., min_length=3, max_length=3, description="Destination airport IATA code"
     )
-    price_threshold: int = Field(..., gt=0, description="Maximum price in COP")
+    price_threshold: int = Field(..., gt=0, description="Maximum one-way price in COP")
+    round_trip_threshold: int | None = Field(
+        default=None,
+        description=(
+            "Maximum combined round-trip price in COP. "
+            "When None, defaults to 2 × price_threshold."
+        ),
+    )
     drop_percentage: int = Field(
         ..., ge=0, le=100, description="Minimum drop percentage to notify"
     )
     search_days: list[SearchDay] = Field(
         default_factory=lambda: [SearchDay.FRIDAY],
-        description="Days to search for flights (relative to weekend Friday)",
+        description="Days to search for outbound flights",
     )
+    return_days: list[SearchDay] = Field(
+        default_factory=lambda: [SearchDay.SUNDAY, SearchDay.MONDAY],
+        description="Valid return days (round_trip mode only)",
+    )
+    search_mode: SearchMode = Field(
+        default=SearchMode.ONE_WAY,
+        description="Whether to search one-way legs or combined round-trip",
+    )
+
+    @property
+    def effective_round_trip_threshold(self) -> int:
+        """Combined threshold for round-trip searches."""
+        return self.round_trip_threshold or (self.price_threshold * 2)
 
     @field_validator("origin", "destination", mode="before")
     @classmethod

@@ -43,20 +43,20 @@ class SearchFormLocators:
     SEARCH_CONTAINER = "[data-flt-ve='hero']"
 
     # Origin / Destination text fields
-    ORIGIN_INPUT = "input[aria-label*='origen'], input[placeholder*='origen']"
-    DESTINATION_INPUT = "input[aria-label*='destino'], input[placeholder*='destino']"
+    ORIGIN_INPUT = "input[aria-label='¿Desde dónde?'], input[aria-label*='origen'], input[placeholder*='origen']"
+    DESTINATION_INPUT = "input[aria-label='¿A dónde quieres ir? '], input[aria-label*='destino'], input[placeholder*='destino']"
     SWAP_BUTTON = "button[aria-label*='Intercambiar']"
 
     # Date inputs (one-way or round-trip)
-    DEPARTURE_DATE_INPUT = "input[aria-label*='Salida'], input[placeholder*='Salida']"
-    RETURN_DATE_INPUT = "input[aria-label*='Vuelta'], input[placeholder*='Vuelta']"
+    DEPARTURE_DATE_INPUT = "input[aria-label='Salida'], input[placeholder='Salida']"
+    RETURN_DATE_INPUT = "input[aria-label='Regreso'], input[placeholder='Regreso'], input[aria-label*='Vuelta']"
 
     # Trip type toggle
     TRIP_TYPE_DROPDOWN = "button[aria-label*='tipo de viaje']"
     ONE_WAY_OPTION = "[data-value='2']"
     ROUND_TRIP_OPTION = "[data-value='1']"
 
-    SEARCH_BUTTON = "button[aria-label*='Buscar'], button[aria-label*='Explorar']"
+    SEARCH_BUTTON = "button[aria-label='Buscar'], button[jsname='c6xFrd']"
 
 
 # =============================================================================
